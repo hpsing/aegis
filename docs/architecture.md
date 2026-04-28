@@ -89,3 +89,41 @@ costly dishonesty.
    │     • ProofBundles per settled job on 0G Storage                │
    └─────────────────────────────────────────────────────────────────┘
 ```
+
+## Trust assumptions and the threat model
+
+### What we trust
+
+1. **The chain itself.** Base, 0G Chain. Block finality.
+2. **The cryptography.** ed25519, secp256k1 ECDSA, keccak256.
+3. **At least 1 of N verifiers honest** AND **fewer than 1/3 colluding.** Standard BFT.
+4. **AXL doesn't drop more than ~1/3 of messages.**
+5. **The executor will eventually `submitClaim` or time out** (`cancelStaleJob` recovers).
+
+### What we DON'T trust
+
+1. Any single verifier — that's the whole point.
+2. Any single RPC endpoint — fallbacks per verifier.
+3. The executor — reported result must match on-chain truth.
+4. The client — impossible specs cause unanimous FAIL with no executor harm.
+
+## Scope
+
+### In scope
+
+- 3 verifier agents
+- Single workload type: Uniswap V3 single-hop swap
+- Commit-reveal with stake-weighted majority
+- ERC-7857 iNFT minting + 0G Storage logs
+- KeeperHub MCP for all settlement txs
+- Demo: TODO::
+- reproducible scenarios: TODO::
+
+### Out of scope
+
+- Multi-hop Uniswap routes, other dexes
+- Quadratic stake weighting
+- Verifier client diversity
+- Slashing for non-revealers
+- ZK-proof of verifier execution
+- Cross-chain verification beyond Base + 0G
