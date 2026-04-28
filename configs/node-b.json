@@ -1,0 +1,7 @@
+{
+  "PrivateKeyPath": ".axl/keys/private-b.pem",
+  "Listen": [],
+  "Peers": ["tls://127.0.0.1:9001"],
+  "api_port": 9012,
+  "tcp_port": 7001
+}

@@ -1,0 +1,26 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.peers.json
+.keys/
+coverage/
+coverage.out
+out/
+cache/
+broadcast/
+
+# AXL local state
+.axl/
+.smoke-mock/
+.smoke-real/
+
+# Go build artifacts at top level (never commit binaries)
+/verifier
+/publisher
+/executor
+/mock-axl
+*.test
