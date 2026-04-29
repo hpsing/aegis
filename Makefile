@@ -1,4 +1,5 @@
-.PHONY: build vet test cover staticcheck fmt-check \
+.PHONY: build vet test cover staticcheck fmt-check fresh \
+        contracts-build contracts-test contracts-clean contracts-fresh \
         setup-axl run-axl stop-axl
 
 build:
@@ -9,6 +10,22 @@ vet:
 
 test:
 	go test ./...
+
+fresh:
+	go clean -cache
+	go build ./...
+
+contracts-build:
+	cd contracts && forge build
+
+contracts-test:
+	cd contracts && forge test
+
+contracts-clean:
+	cd contracts && forge clean
+
+contracts-fresh:
+	cd contracts && forge clean && forge build
 
 cover:
 	go test -cover ./internal/...
@@ -28,4 +45,3 @@ run-axl:
 
 stop-axl:
 	sh scripts/stop-axl.sh
-
