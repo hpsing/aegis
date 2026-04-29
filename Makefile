@@ -1,6 +1,6 @@
 .PHONY: build vet test cover staticcheck fmt-check fresh \
         contracts-build contracts-test contracts-clean contracts-fresh abigen \
-        deploy-local deploy-og \
+        deploy-local deploy-og run-publisher run-executor local-demo \
         setup-axl run-axl stop-axl
 
 build:
@@ -76,3 +76,25 @@ abigen:
 	abigen --abi /tmp/registry.abi.json --pkg aegis --type VerifierRegistry --out internal/aegis/verifier_registry.go
 	abigen --abi /tmp/mockusdc.abi.json --pkg aegis --type MockUSDC --out internal/aegis/mock_usdc.go
 	go build ./...
+
+# Run the publisher (client) CLI. Requires env:
+#   AEGIS_RPC, AEGIS_CONTRACT, USDC_CONTRACT, CLIENT_PRIVATE_KEY, EXECUTOR_ADDRESS
+# Optional: override amounts with REIMBURSEMENT/FEE/BOUNTY (USDC, 6 decimals).
+REIMBURSEMENT ?= 100000000
+FEE           ?= 10000000
+BOUNTY        ?= 30000000
+run-publisher:
+	go run ./cmd/publisher \
+		--reimbursement=$(REIMBURSEMENT) --fee=$(FEE) --bounty=$(BOUNTY)
+
+# Run the executor CLI. Requires env:
+#   AEGIS_RPC, AEGIS_CONTRACT, EXECUTOR_PRIVATE_KEY, JOB_ID, CLIENT_ADDRESS
+# Override mode with: make run-executor MODE=high-slippage
+MODE ?= honest
+run-executor:
+	go run ./cmd/executor --mode=$(MODE)
+
+# Full e2e: register 3 verifiers, post a job, submitClaim, commit/reveal, settle.
+# Anvil must be running and `make deploy-local` must have run.
+local-demo:
+	bash scripts/local-demo.sh
