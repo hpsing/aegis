@@ -15,7 +15,7 @@ import { MockUSDC } from "../mocks/MockUSDC.sol";
 abstract contract TestSetup is Test {
     MockUSDC internal usdc;
     VerifierRegistry internal registry;
-    AegisContract internal quorum;
+    AegisContract internal aegis;
 
     address internal owner = address(0xA1);
     address internal treasury = address(0x77);
@@ -36,8 +36,8 @@ abstract contract TestSetup is Test {
 
         vm.startPrank(owner);
         registry = new VerifierRegistry(IUSDC(address(usdc)), owner);
-        quorum = new AegisContract(IUSDC(address(usdc)), registry, treasury, owner);
-        registry.setQuorum(address(quorum));
+        aegis = new AegisContract(IUSDC(address(usdc)), registry, treasury, owner);
+        registry.setAegis(address(aegis));
         vm.stopPrank();
 
         // Fund actors generously.
@@ -56,9 +56,9 @@ abstract contract TestSetup is Test {
             vm.stopPrank();
         }
 
-        // Client approves quorum to pull (reimbursement + fee + bounty).
+        // Client approves aegis to pull (reimbursement + fee + bounty).
         vm.prank(client);
-        usdc.approve(address(quorum), type(uint256).max);
+        usdc.approve(address(aegis), type(uint256).max);
     }
 
     function _verifier(
@@ -83,9 +83,9 @@ abstract contract TestSetup is Test {
         bytes32 specHash
     ) internal returns (uint256 jobId) {
         vm.prank(client);
-        jobId = quorum.postJob(specHash, executor, REIMBURSEMENT, FEE, BOUNTY);
+        jobId = aegis.postJob(specHash, executor, REIMBURSEMENT, FEE, BOUNTY);
         vm.prank(executor);
-        quorum.submitClaim(jobId, keccak256("tx"), keccak256("outcome"));
+        aegis.submitClaim(jobId, keccak256("tx"), keccak256("outcome"));
     }
 
     function _commitHash(
@@ -103,11 +103,11 @@ abstract contract TestSetup is Test {
         bytes32 nonce
     ) internal {
         vm.prank(verifier);
-        quorum.commitVote(jobId, _commitHash(verdict, nonce, verifier));
+        aegis.commitVote(jobId, _commitHash(verdict, nonce, verifier));
     }
 
     function _doReveal(uint256 jobId, address verifier, bool verdict, bytes32 nonce) internal {
         vm.prank(verifier);
-        quorum.revealVote(jobId, verdict, nonce);
+        aegis.revealVote(jobId, verdict, nonce);
     }
 }

@@ -59,10 +59,15 @@ deploy-local:
 # Deploy to 0G Galileo testnet. Requires:
 #   OG_GALILEO_RPC, DEPLOYER_PRIVATE_KEY, TREASURY_ADDRESS
 #   USDC_ADDRESS (optional — if unset, deploys MockUSDC)
+# 0G's reported base fee is ~0 but the chain enforces a min priority fee of
+# 2 gwei, which trips up forge's EIP-1559 math. Use legacy txs with a flat
+# gas price to sidestep. Override via OG_GAS_GWEI.
+OG_GAS_GWEI ?= 5
 deploy-og:
 	cd contracts && forge script script/DeployToOG.s.sol:DeployToOG \
-		--broadcast --rpc-url $$OG_GALILEO_RPC \
-		--private-key $$DEPLOYER_PRIVATE_KEY
+		--broadcast --legacy --rpc-url $$OG_GALILEO_RPC \
+		--private-key $$DEPLOYER_PRIVATE_KEY \
+		--gas-price $(shell echo $$(( $(OG_GAS_GWEI) * 1000000000 )))
 
 # Regenerate abigen bindings from contracts/out/. Run after changing
 # contract ABIs.

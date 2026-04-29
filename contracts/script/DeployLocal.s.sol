@@ -32,9 +32,9 @@ contract DeployLocal is Script {
         MockUSDC usdc = new MockUSDC();
         VerifierINFT inft = new VerifierINFT(DEPLOYER);
         VerifierRegistry registry = new VerifierRegistry(IUSDC(address(usdc)), DEPLOYER);
-        AegisContract quorum =
+        AegisContract aegis =
             new AegisContract(IUSDC(address(usdc)), registry, TREASURY, DEPLOYER);
-        registry.setQuorum(address(quorum));
+        registry.setAegis(address(aegis));
         registry.setINftContract(inft);
 
         // Fund the demo actors so they can post jobs / register / etc.
@@ -48,7 +48,7 @@ contract DeployLocal is Script {
         console2.log("MockUSDC:        ", address(usdc));
         console2.log("VerifierINFT:    ", address(inft));
         console2.log("VerifierRegistry:", address(registry));
-        console2.log("AegisContract:  ", address(quorum));
+        console2.log("AegisContract:  ", address(aegis));
         console2.log("Treasury:        ", TREASURY);
 
         string memory json = string(
@@ -64,8 +64,8 @@ contract DeployLocal is Script {
                 '  "registry": "',
                 vm.toString(address(registry)),
                 '",\n',
-                '  "quorum": "',
-                vm.toString(address(quorum)),
+                '  "aegis": "',
+                vm.toString(address(aegis)),
                 '"\n',
                 "}\n"
             )

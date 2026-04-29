@@ -13,14 +13,14 @@ contract VerifierRegistryTest is Test {
 
     address internal owner = address(0xA1);
     address internal alice = address(0xA11CE);
-    address internal pretendQuorum = address(0xCAFE);
+    address internal pretendAegis = address(0xCAFE);
 
     function setUp() public {
         usdc = new MockUSDC();
         vm.prank(owner);
         registry = new VerifierRegistry(IUSDC(address(usdc)), owner);
         vm.prank(owner);
-        registry.setQuorum(pretendQuorum);
+        registry.setAegis(pretendAegis);
 
         usdc.mint(alice, 10_000e6);
     }
@@ -48,7 +48,7 @@ contract VerifierRegistryTest is Test {
         _registerAlice();
 
         // 7 correct out of 10 → 7000 bps.
-        vm.startPrank(pretendQuorum);
+        vm.startPrank(pretendAegis);
         for (uint256 i = 0; i < 10; i++) {
             registry.recordVote(alice, i < 7);
         }
@@ -76,23 +76,23 @@ contract VerifierRegistryTest is Test {
         assertEq(usdc.balanceOf(alice), balBefore + stakeBefore);
     }
 
-    function test_OnlyQuorumCanSlash() public {
+    function test_OnlyAegisCanSlash() public {
         _registerAlice();
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(VerifierRegistry.NotQuorum.selector, alice));
+        vm.expectRevert(abi.encodeWithSelector(VerifierRegistry.NotAegis.selector, alice));
         registry.slash(alice, 1e6, address(0xDEAD));
 
-        vm.prank(pretendQuorum);
+        vm.prank(pretendAegis);
         registry.slash(alice, 1e6, address(0xDEAD));
     }
 
-    function test_OnlyQuorumCanRecordVote() public {
+    function test_OnlyAegisCanRecordVote() public {
         _registerAlice();
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(VerifierRegistry.NotQuorum.selector, alice));
+        vm.expectRevert(abi.encodeWithSelector(VerifierRegistry.NotAegis.selector, alice));
         registry.recordVote(alice, true);
 
-        vm.prank(pretendQuorum);
+        vm.prank(pretendAegis);
         registry.recordVote(alice, true);
     }
 

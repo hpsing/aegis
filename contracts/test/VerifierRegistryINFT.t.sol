@@ -17,14 +17,14 @@ contract VerifierRegistryINFTTest is Test {
     address internal owner = address(0xA1);
     address internal alice = address(0xA11CE);
     address internal bob = address(0xB0B);
-    address internal pretendQuorum = address(0xCAFE);
+    address internal pretendAegis = address(0xCAFE);
 
     function setUp() public {
         usdc = new MockUSDC();
         vm.startPrank(owner);
         registry = new VerifierRegistry(IUSDC(address(usdc)), owner);
         inft = new VerifierINFT(owner);
-        registry.setQuorum(pretendQuorum);
+        registry.setAegis(pretendAegis);
         registry.setINftContract(inft);
         vm.stopPrank();
 
@@ -68,7 +68,7 @@ contract VerifierRegistryINFTTest is Test {
         // Spin up a fresh registry without setINftContract.
         vm.startPrank(owner);
         VerifierRegistry r2 = new VerifierRegistry(IUSDC(address(usdc)), owner);
-        r2.setQuorum(pretendQuorum);
+        r2.setAegis(pretendAegis);
         vm.stopPrank();
 
         // Alice registers with arbitrary tokenId — accepted, no check.

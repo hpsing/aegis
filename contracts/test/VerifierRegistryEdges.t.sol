@@ -14,14 +14,14 @@ contract VerifierRegistryEdges is Test {
 
     address internal owner = address(0xA1);
     address internal alice = address(0xA11CE);
-    address internal pretendQuorum = address(0xCAFE);
+    address internal pretendAegis = address(0xCAFE);
 
     function setUp() public {
         usdc = new MockUSDC();
         vm.prank(owner);
         registry = new VerifierRegistry(IUSDC(address(usdc)), owner);
         vm.prank(owner);
-        registry.setQuorum(pretendQuorum);
+        registry.setAegis(pretendAegis);
         usdc.mint(alice, 10_000e6);
         vm.startPrank(alice);
         usdc.approve(address(registry), type(uint256).max);
@@ -61,7 +61,7 @@ contract VerifierRegistryEdges is Test {
         vm.prank(alice);
         registry.register(120e6, 0);
         // Slash to under minStake.
-        vm.prank(pretendQuorum);
+        vm.prank(pretendAegis);
         registry.slash(alice, 30e6, address(0xDEAD));
         assertFalse(registry.isActive(alice), "should be inactive after sub-min slash");
 
@@ -80,20 +80,20 @@ contract VerifierRegistryEdges is Test {
         assertEq(registry.minStake(), 50e6);
     }
 
-    function test_SetQuorum_OnlyOnce() public {
+    function test_SetAegis_OnlyOnce() public {
         // Already set in setUp(); a second call should revert.
         vm.prank(owner);
-        vm.expectRevert(bytes("quorum already set"));
-        registry.setQuorum(address(0xBEEF));
+        vm.expectRevert(bytes("aegis already set"));
+        registry.setAegis(address(0xBEEF));
     }
 
-    function test_SetQuorum_RejectsZero() public {
-        // Fresh registry where quorum hasn't been set.
+    function test_SetAegis_RejectsZero() public {
+        // Fresh registry where aegis hasn't been set.
         vm.prank(owner);
         VerifierRegistry r = new VerifierRegistry(IUSDC(address(usdc)), owner);
         vm.prank(owner);
-        vm.expectRevert(bytes("zero quorum"));
-        r.setQuorum(address(0));
+        vm.expectRevert(bytes("zero aegis"));
+        r.setAegis(address(0));
     }
 
     function test_VerifierCount_GrowsOnRegister() public {
@@ -110,7 +110,7 @@ contract VerifierRegistryEdges is Test {
     }
 
     function test_Slash_OnUnregisteredReverts() public {
-        vm.prank(pretendQuorum);
+        vm.prank(pretendAegis);
         vm.expectRevert(VerifierRegistry.NotRegistered.selector);
         registry.slash(alice, 10e6, address(0xDEAD));
     }
@@ -118,13 +118,13 @@ contract VerifierRegistryEdges is Test {
     function test_Slash_ZeroRecipientReverts() public {
         vm.prank(alice);
         registry.register(500e6, 0);
-        vm.prank(pretendQuorum);
+        vm.prank(pretendAegis);
         vm.expectRevert(VerifierRegistry.ZeroRecipient.selector);
         registry.slash(alice, 10e6, address(0));
     }
 
     function test_RecordVote_OnUnregisteredReverts() public {
-        vm.prank(pretendQuorum);
+        vm.prank(pretendAegis);
         vm.expectRevert(VerifierRegistry.NotRegistered.selector);
         registry.recordVote(alice, true);
     }

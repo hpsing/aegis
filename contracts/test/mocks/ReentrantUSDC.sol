@@ -14,7 +14,7 @@ interface IReentrancyTarget {
 /// AegisContract's nonReentrant guard actually fires.
 contract ReentrantUSDC is ERC20 {
     address public reentrancyTrigger;
-    address public quorum;
+    address public aegis;
     uint256 public reentryJobId;
     bool public attemptedReenter;
     bool public reenterReverted;
@@ -31,20 +31,20 @@ contract ReentrantUSDC is ERC20 {
 
     /// @notice Configure the recipient address that triggers a reenter,
     /// and the AegisContract + jobId to call back into.
-    function arm(address trigger, address _quorum, uint256 _jobId) external {
+    function arm(address trigger, address _aegis, uint256 _jobId) external {
         reentrancyTrigger = trigger;
-        quorum = _quorum;
+        aegis = _aegis;
         reentryJobId = _jobId;
     }
 
     function _update(address from, address to, uint256 amount) internal override {
         super._update(from, to, amount);
-        if (to != address(0) && to == reentrancyTrigger && quorum != address(0)) {
+        if (to != address(0) && to == reentrancyTrigger && aegis != address(0)) {
             attemptedReenter = true;
             // Prevent infinite recursion in case the guard is missing.
-            address localQuorum = quorum;
-            quorum = address(0);
-            try IReentrancyTarget(localQuorum).settle(reentryJobId) {
+            address localAegis = aegis;
+            aegis = address(0);
+            try IReentrancyTarget(localAegis).settle(reentryJobId) {
                 reenterReverted = false;
             } catch {
                 reenterReverted = true;

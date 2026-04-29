@@ -46,7 +46,7 @@ contract VerifierRegistry is IVerifierRegistry, Ownable {
     address[] public verifierAddresses;
     mapping(address => bool) private isRegistered;
 
-    address public quorum; // the AegisContract; set once via setQuorum
+    address public aegis; // the AegisContract; set once via setAegis
     uint256 public minStake;
 
     event VerifierRegistered(address indexed verifier, uint256 stake, uint256 iNftId);
@@ -59,13 +59,13 @@ contract VerifierRegistry is IVerifierRegistry, Ownable {
     event VoteRecorded(
         address indexed verifier, bool wasCorrect, uint256 votesTotal, uint256 votesCorrect
     );
-    event QuorumSet(address indexed quorum);
+    event AegisSet(address indexed aegis);
     event MinStakeUpdated(uint256 oldMin, uint256 newMin);
 
     error InsufficientStake(uint256 provided, uint256 required);
     error NotRegistered();
     error AlreadyRegistered();
-    error NotQuorum(address caller);
+    error NotAegis(address caller);
     error WithdrawNotRequested();
     error CooldownNotElapsed(uint256 unlockBlock, uint256 currentBlock);
     error ZeroRecipient();
@@ -77,13 +77,13 @@ contract VerifierRegistry is IVerifierRegistry, Ownable {
     }
 
     /// @notice Wire the AegisContract address. Callable once by owner.
-    function setQuorum(
-        address _quorum
+    function setAegis(
+        address _aegis
     ) external onlyOwner {
-        require(quorum == address(0), "quorum already set");
-        require(_quorum != address(0), "zero quorum");
-        quorum = _quorum;
-        emit QuorumSet(_quorum);
+        require(aegis == address(0), "aegis already set");
+        require(_aegis != address(0), "zero aegis");
+        aegis = _aegis;
+        emit AegisSet(_aegis);
     }
 
     /// @notice Wire the VerifierINFT contract. Owner-only. If left as zero
@@ -174,7 +174,7 @@ contract VerifierRegistry is IVerifierRegistry, Ownable {
         uint256 amount,
         address recipient
     ) external returns (uint256 actualSlashed) {
-        if (msg.sender != quorum) revert NotQuorum(msg.sender);
+        if (msg.sender != aegis) revert NotAegis(msg.sender);
         if (!isRegistered[verifier]) revert NotRegistered();
         if (recipient == address(0)) revert ZeroRecipient();
 
@@ -199,7 +199,7 @@ contract VerifierRegistry is IVerifierRegistry, Ownable {
 
     /// @inheritdoc IVerifierRegistry
     function recordVote(address verifier, bool wasCorrect) external {
-        if (msg.sender != quorum) revert NotQuorum(msg.sender);
+        if (msg.sender != aegis) revert NotAegis(msg.sender);
         if (!isRegistered[verifier]) revert NotRegistered();
 
         Verifier storage v = verifiers[verifier];

@@ -41,7 +41,7 @@ contract VerifierINFT is ERC721, Ownable {
 
     constructor(
         address initialOwner
-    ) ERC721("Quorum Verifier iNFT", "QVI") Ownable(initialOwner) { }
+    ) ERC721("Aegis Verifier iNFT", "AVI") Ownable(initialOwner) { }
 
     /// @notice Mint a new verifier iNFT to `to`. `to` becomes both the
     /// holder AND the initial controller — two roles that diverge later

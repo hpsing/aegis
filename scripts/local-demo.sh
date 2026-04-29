@@ -13,7 +13,7 @@ DEPLOY=contracts/deployments/local.json
 
 RPC=${RPC_URL:-http://127.0.0.1:8545}
 USDC=$(jq -r .usdc $DEPLOY)
-AEGIS=$(jq -r .quorum $DEPLOY)
+AEGIS=$(jq -r .aegis $DEPLOY)
 REGISTRY=$(jq -r .registry $DEPLOY)
 
 # Anvil's deterministic accounts

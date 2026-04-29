@@ -6,10 +6,11 @@
 
 | Contract         | Address                                      |
 | ---------------- | -------------------------------------------- |
-| MockUSDC         | `0x4bf010f1b9beDA5450a8dD702ED602A104ff65EE` |
-| VerifierINFT     | `0x40a42Baf86Fc821f972Ad2aC878729063CeEF403` |
-| VerifierRegistry | `0x96F3Ce39Ad2BfDCf92C0F6E2C2CAbF83874660Fc` |
-| AegisContract    | `0x986aaa537b8cc170761FDAC6aC4fc7F9d8a20A8C` |
-| Treasury         | `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266` |
+| MockUSDC         | `0xC74c0D2e91B715C89474c8480C812170054ef422` |
+| VerifierINFT     | `0xb3cf3DFC39456e6c637c3f44C8bd59052d01E55E` |
+| VerifierRegistry | `0x5ec805A1991ECa4Fb876E86866bc32D9095F1270` |
+| AegisContract    | `0xeF60Ad6aB86101F3f787C33957649b5c7a9Ca858` |
+| Treasury         | `0x7C9DcA2fB05cFc732794CEe846888f3B1D7FE06a` |
+| Owner / Deployer | `0x7C9DcA2fB05cFc732794CEe846888f3B1D7FE06a` |
 
 **important** Treasury is personal wallet but can be independent contract that manages the tresury.

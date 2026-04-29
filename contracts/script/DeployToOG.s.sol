@@ -51,8 +51,8 @@ contract DeployToOG is Script {
 
         VerifierINFT inft = new VerifierINFT(deployer);
         VerifierRegistry registry = new VerifierRegistry(IUSDC(usdcAddr), deployer);
-        AegisContract quorum = new AegisContract(IUSDC(usdcAddr), registry, treasury, deployer);
-        registry.setQuorum(address(quorum));
+        AegisContract aegis = new AegisContract(IUSDC(usdcAddr), registry, treasury, deployer);
+        registry.setAegis(address(aegis));
         registry.setINftContract(inft);
 
         vm.stopBroadcast();
@@ -60,10 +60,10 @@ contract DeployToOG is Script {
         console2.log("USDC:             ", usdcAddr);
         console2.log("VerifierINFT:     ", address(inft));
         console2.log("VerifierRegistry: ", address(registry));
-        console2.log("AegisContract:   ", address(quorum));
+        console2.log("AegisContract:   ", address(aegis));
         console2.log("Treasury:         ", treasury);
 
-        _writeDeployments(usdcAddr, address(inft), address(registry), address(quorum), treasury);
+        _writeDeployments(usdcAddr, address(inft), address(registry), address(aegis), treasury);
     }
 
     /// @dev Split out of run() to keep the stack shallow (Solidity hits
@@ -72,7 +72,7 @@ contract DeployToOG is Script {
         address usdcAddr,
         address inft,
         address registry,
-        address quorum,
+        address aegis,
         address treasury
     ) internal {
         string memory part1 = string(
@@ -94,8 +94,8 @@ contract DeployToOG is Script {
                 '  "registry": "',
                 vm.toString(registry),
                 '",\n',
-                '  "quorum": "',
-                vm.toString(quorum),
+                '  "aegis": "',
+                vm.toString(aegis),
                 '",\n',
                 '  "treasury": "',
                 vm.toString(treasury),

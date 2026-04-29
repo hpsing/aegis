@@ -21,13 +21,13 @@ contract AegisContractTest is TestSetup {
         _commitAndReveal(jobId, verifier2, true, n2);
         _commitAndReveal(jobId, verifier3, true, n3);
 
-        vm.warp(block.timestamp + quorum.DEFAULT_COMMIT_WINDOW() + 1);
+        vm.warp(block.timestamp + aegis.DEFAULT_COMMIT_WINDOW() + 1);
         _doReveal(jobId, verifier1, true, n1);
         _doReveal(jobId, verifier2, true, n2);
         _doReveal(jobId, verifier3, true, n3);
 
-        vm.warp(block.timestamp + quorum.DEFAULT_REVEAL_WINDOW() + 1);
-        quorum.settle(jobId);
+        vm.warp(block.timestamp + aegis.DEFAULT_REVEAL_WINDOW() + 1);
+        aegis.settle(jobId);
 
         // PASS: executor receives reimbursement + fee.
         assertEq(
@@ -52,13 +52,13 @@ contract AegisContractTest is TestSetup {
         _commitAndReveal(jobId, verifier2, false, n2);
         _commitAndReveal(jobId, verifier3, false, n3);
 
-        vm.warp(block.timestamp + quorum.DEFAULT_COMMIT_WINDOW() + 1);
+        vm.warp(block.timestamp + aegis.DEFAULT_COMMIT_WINDOW() + 1);
         _doReveal(jobId, verifier1, false, n1);
         _doReveal(jobId, verifier2, false, n2);
         _doReveal(jobId, verifier3, false, n3);
 
-        vm.warp(block.timestamp + quorum.DEFAULT_REVEAL_WINDOW() + 1);
-        quorum.settle(jobId);
+        vm.warp(block.timestamp + aegis.DEFAULT_REVEAL_WINDOW() + 1);
+        aegis.settle(jobId);
 
         // FAIL with executor not registered: client gets reimbursement + fee back,
         // but no executor slash flows (best-effort).
@@ -89,15 +89,15 @@ contract AegisContractTest is TestSetup {
         _commitAndReveal(jobId, verifier2, false, n2);
         _commitAndReveal(jobId, verifier3, false, n3);
 
-        vm.warp(block.timestamp + quorum.DEFAULT_COMMIT_WINDOW() + 1);
+        vm.warp(block.timestamp + aegis.DEFAULT_COMMIT_WINDOW() + 1);
         _doReveal(jobId, verifier1, false, n1);
         _doReveal(jobId, verifier2, false, n2);
         _doReveal(jobId, verifier3, false, n3);
 
-        vm.warp(block.timestamp + quorum.DEFAULT_REVEAL_WINDOW() + 1);
-        quorum.settle(jobId);
+        vm.warp(block.timestamp + aegis.DEFAULT_REVEAL_WINDOW() + 1);
+        aegis.settle(jobId);
 
-        uint256 slashTotal = quorum.SLASH_EXECUTOR_ON_FAIL();
+        uint256 slashTotal = aegis.SLASH_EXECUTOR_ON_FAIL();
         uint256 toClient = slashTotal / 2;
         uint256 toVerifiers = slashTotal - toClient;
         uint256 perVerifier = toVerifiers / 3;
@@ -133,26 +133,26 @@ contract AegisContractTest is TestSetup {
         _commitAndReveal(jobId, verifier2, true, n2);
         _commitAndReveal(jobId, verifier3, false, n3); // dissenter
 
-        vm.warp(block.timestamp + quorum.DEFAULT_COMMIT_WINDOW() + 1);
+        vm.warp(block.timestamp + aegis.DEFAULT_COMMIT_WINDOW() + 1);
         _doReveal(jobId, verifier1, true, n1);
         _doReveal(jobId, verifier2, true, n2);
         _doReveal(jobId, verifier3, false, n3);
 
-        vm.warp(block.timestamp + quorum.DEFAULT_REVEAL_WINDOW() + 1);
+        vm.warp(block.timestamp + aegis.DEFAULT_REVEAL_WINDOW() + 1);
         uint256 treasuryBalBefore = usdc.balanceOf(treasury);
-        quorum.settle(jobId);
+        aegis.settle(jobId);
 
         // V3 dissented → slashed by SLASH_PER_DISSENT, routed to treasury.
         assertEq(
             registry.stakeOf(verifier3),
-            VERIFIER_STAKE - quorum.SLASH_PER_DISSENT(),
+            VERIFIER_STAKE - aegis.SLASH_PER_DISSENT(),
             "dissenter slashed"
         );
         assertEq(registry.stakeOf(verifier1), VERIFIER_STAKE, "majority verifier 1 not slashed");
         assertEq(registry.stakeOf(verifier2), VERIFIER_STAKE, "majority verifier 2 not slashed");
         assertEq(
             usdc.balanceOf(treasury),
-            treasuryBalBefore + quorum.SLASH_PER_DISSENT(),
+            treasuryBalBefore + aegis.SLASH_PER_DISSENT(),
             "treasury received the slashed funds"
         );
     }
@@ -162,18 +162,18 @@ contract AegisContractTest is TestSetup {
         bytes32 n = keccak256("n");
 
         _commitAndReveal(jobId, verifier1, true, n);
-        vm.warp(block.timestamp + quorum.DEFAULT_COMMIT_WINDOW() + 1);
+        vm.warp(block.timestamp + aegis.DEFAULT_COMMIT_WINDOW() + 1);
         vm.prank(verifier1);
         vm.expectRevert();
-        quorum.revealVote(jobId, false, n);
+        aegis.revealVote(jobId, false, n);
     }
 
     function test_CannotCommitAfterDeadline() public {
         uint256 jobId = _postAndClaim(SPEC_HASH);
-        vm.warp(block.timestamp + quorum.DEFAULT_COMMIT_WINDOW() + 1);
+        vm.warp(block.timestamp + aegis.DEFAULT_COMMIT_WINDOW() + 1);
         vm.prank(verifier1);
         vm.expectRevert();
-        quorum.commitVote(jobId, _commitHash(true, keccak256("n"), verifier1));
+        aegis.commitVote(jobId, _commitHash(true, keccak256("n"), verifier1));
     }
 
     function test_CannotRevealAfterDeadline() public {
@@ -182,11 +182,11 @@ contract AegisContractTest is TestSetup {
         _commitAndReveal(jobId, verifier1, true, n);
 
         vm.warp(
-            block.timestamp + quorum.DEFAULT_COMMIT_WINDOW() + quorum.DEFAULT_REVEAL_WINDOW() + 1
+            block.timestamp + aegis.DEFAULT_COMMIT_WINDOW() + aegis.DEFAULT_REVEAL_WINDOW() + 1
         );
         vm.prank(verifier1);
         vm.expectRevert();
-        quorum.revealVote(jobId, true, n);
+        aegis.revealVote(jobId, true, n);
     }
 
     function test_DoubleSettleReverts() public {
@@ -198,27 +198,27 @@ contract AegisContractTest is TestSetup {
         _commitAndReveal(jobId, verifier2, true, n2);
         _commitAndReveal(jobId, verifier3, true, n3);
 
-        vm.warp(block.timestamp + quorum.DEFAULT_COMMIT_WINDOW() + 1);
+        vm.warp(block.timestamp + aegis.DEFAULT_COMMIT_WINDOW() + 1);
         _doReveal(jobId, verifier1, true, n1);
         _doReveal(jobId, verifier2, true, n2);
         _doReveal(jobId, verifier3, true, n3);
 
-        vm.warp(block.timestamp + quorum.DEFAULT_REVEAL_WINDOW() + 1);
-        quorum.settle(jobId);
+        vm.warp(block.timestamp + aegis.DEFAULT_REVEAL_WINDOW() + 1);
+        aegis.settle(jobId);
 
         vm.expectRevert();
-        quorum.settle(jobId);
+        aegis.settle(jobId);
     }
 
     function test_CancelStaleJobRefundsFullEscrow() public {
         vm.prank(client);
-        uint256 jobId = quorum.postJob(SPEC_HASH, executor, REIMBURSEMENT, FEE, BOUNTY);
+        uint256 jobId = aegis.postJob(SPEC_HASH, executor, REIMBURSEMENT, FEE, BOUNTY);
 
-        vm.warp(block.timestamp + quorum.DEFAULT_CLAIM_WINDOW() + 1);
+        vm.warp(block.timestamp + aegis.DEFAULT_CLAIM_WINDOW() + 1);
 
         uint256 clientBalBefore = usdc.balanceOf(client);
         vm.prank(client);
-        quorum.cancelStaleJob(jobId);
+        aegis.cancelStaleJob(jobId);
         assertEq(
             usdc.balanceOf(client),
             clientBalBefore + REIMBURSEMENT + FEE + BOUNTY,
@@ -227,8 +227,8 @@ contract AegisContractTest is TestSetup {
     }
 
     function test_SlashingCannotUnderflow() public {
-        // Drive verifier3's stake to zero by repeated quorum-driven slashes.
-        vm.startPrank(address(quorum));
+        // Drive verifier3's stake to zero by repeated aegis-driven slashes.
+        vm.startPrank(address(aegis));
         for (uint256 i = 0; i < 200; i++) {
             registry.slash(verifier3, 100e6, treasury);
         }
@@ -243,7 +243,7 @@ contract AegisContractTest is TestSetup {
         VerifierRegistry reg2 = new VerifierRegistry(IUSDC(address(rusdc)), owner);
         AegisContract q2 = new AegisContract(IUSDC(address(rusdc)), reg2, treasury, owner);
         vm.prank(owner);
-        reg2.setQuorum(address(q2));
+        reg2.setAegis(address(q2));
 
         rusdc.mint(client, 100_000e6);
         for (uint256 i = 0; i < 3; i++) {

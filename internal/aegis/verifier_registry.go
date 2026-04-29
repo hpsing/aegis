@@ -31,7 +31,7 @@ var (
 
 // VerifierRegistryMetaData contains all meta data concerning the VerifierRegistry contract.
 var VerifierRegistryMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"_usdc\",\"type\":\"address\",\"internalType\":\"contractIUSDC\"},{\"name\":\"initialOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"DEFAULT_MIN_STAKE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"WITHDRAW_COOLDOWN_BLOCKS\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"addStake\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAccuracy\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"bps\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"iNftContract\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractVerifierINFT\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isActive\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"minStake\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"quorum\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"recordVote\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"wasCorrect\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"register\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"iNftId\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"renounceOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"requestWithdraw\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setINftContract\",\"inputs\":[{\"name\":\"_iNft\",\"type\":\"address\",\"internalType\":\"contractVerifierINFT\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setMinStake\",\"inputs\":[{\"name\":\"_minStake\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setQuorum\",\"inputs\":[{\"name\":\"_quorum\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"slash\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"actualSlashed\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"stakeOf\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"usdc\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIUSDC\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"verifierAddresses\",\"inputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"verifierCount\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"verifiers\",\"inputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"stake\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"votesTotal\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"votesCorrect\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"iNftId\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"withdrawableAt\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"active\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"withdraw\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"MinStakeUpdated\",\"inputs\":[{\"name\":\"oldMin\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"newMin\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"QuorumSet\",\"inputs\":[{\"name\":\"quorum\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"StakeAdded\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"newStake\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"StakeWithdrawn\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"VerifierRegistered\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"stake\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"iNftId\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"VerifierSlashed\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"newStake\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"VoteRecorded\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"wasCorrect\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"},{\"name\":\"votesTotal\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"votesCorrect\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawalRequested\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"unlockBlock\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AddressEmptyCode\",\"inputs\":[{\"name\":\"target\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"AddressInsufficientBalance\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"AlreadyRegistered\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CooldownNotElapsed\",\"inputs\":[{\"name\":\"unlockBlock\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"currentBlock\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"FailedInnerCall\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InsufficientStake\",\"inputs\":[{\"name\":\"provided\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"required\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"NotINftController\",\"inputs\":[{\"name\":\"tokenId\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"claimedBy\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"NotQuorum\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"NotRegistered\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnableInvalidOwner\",\"inputs\":[{\"name\":\"owner\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"OwnableUnauthorizedAccount\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"SafeERC20FailedOperation\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"WithdrawNotRequested\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroRecipient\",\"inputs\":[]}]",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"_usdc\",\"type\":\"address\",\"internalType\":\"contractIUSDC\"},{\"name\":\"initialOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"DEFAULT_MIN_STAKE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"WITHDRAW_COOLDOWN_BLOCKS\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"addStake\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"aegis\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAccuracy\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"bps\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"iNftContract\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractVerifierINFT\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"isActive\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"minStake\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"recordVote\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"wasCorrect\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"register\",\"inputs\":[{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"iNftId\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"renounceOwnership\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"requestWithdraw\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setAegis\",\"inputs\":[{\"name\":\"_aegis\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setINftContract\",\"inputs\":[{\"name\":\"_iNft\",\"type\":\"address\",\"internalType\":\"contractVerifierINFT\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setMinStake\",\"inputs\":[{\"name\":\"_minStake\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"slash\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"recipient\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"actualSlashed\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"stakeOf\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"transferOwnership\",\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"usdc\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"contractIUSDC\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"verifierAddresses\",\"inputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"verifierCount\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"verifiers\",\"inputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"stake\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"votesTotal\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"votesCorrect\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"iNftId\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"withdrawableAt\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"active\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"withdraw\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"AegisSet\",\"inputs\":[{\"name\":\"aegis\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"MinStakeUpdated\",\"inputs\":[{\"name\":\"oldMin\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"newMin\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"OwnershipTransferred\",\"inputs\":[{\"name\":\"previousOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"newOwner\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"StakeAdded\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"newStake\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"StakeWithdrawn\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"VerifierRegistered\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"stake\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"iNftId\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"VerifierSlashed\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"recipient\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"newStake\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"VoteRecorded\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"wasCorrect\",\"type\":\"bool\",\"indexed\":false,\"internalType\":\"bool\"},{\"name\":\"votesTotal\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"},{\"name\":\"votesCorrect\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawalRequested\",\"inputs\":[{\"name\":\"verifier\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"unlockBlock\",\"type\":\"uint256\",\"indexed\":false,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AddressEmptyCode\",\"inputs\":[{\"name\":\"target\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"AddressInsufficientBalance\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"AlreadyRegistered\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"CooldownNotElapsed\",\"inputs\":[{\"name\":\"unlockBlock\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"currentBlock\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"FailedInnerCall\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InsufficientStake\",\"inputs\":[{\"name\":\"provided\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"required\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"NotAegis\",\"inputs\":[{\"name\":\"caller\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"NotINftController\",\"inputs\":[{\"name\":\"tokenId\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"claimedBy\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"NotRegistered\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"OwnableInvalidOwner\",\"inputs\":[{\"name\":\"owner\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"OwnableUnauthorizedAccount\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"SafeERC20FailedOperation\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"WithdrawNotRequested\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ZeroRecipient\",\"inputs\":[]}]",
 }
 
 // VerifierRegistryABI is the input ABI used to generate the binding from.
@@ -242,6 +242,37 @@ func (_VerifierRegistry *VerifierRegistryCallerSession) WITHDRAWCOOLDOWNBLOCKS()
 	return _VerifierRegistry.Contract.WITHDRAWCOOLDOWNBLOCKS(&_VerifierRegistry.CallOpts)
 }
 
+// Aegis is a free data retrieval call binding the contract method 0xa10d1dcd.
+//
+// Solidity: function aegis() view returns(address)
+func (_VerifierRegistry *VerifierRegistryCaller) Aegis(opts *bind.CallOpts) (common.Address, error) {
+	var out []interface{}
+	err := _VerifierRegistry.contract.Call(opts, &out, "aegis")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
+}
+
+// Aegis is a free data retrieval call binding the contract method 0xa10d1dcd.
+//
+// Solidity: function aegis() view returns(address)
+func (_VerifierRegistry *VerifierRegistrySession) Aegis() (common.Address, error) {
+	return _VerifierRegistry.Contract.Aegis(&_VerifierRegistry.CallOpts)
+}
+
+// Aegis is a free data retrieval call binding the contract method 0xa10d1dcd.
+//
+// Solidity: function aegis() view returns(address)
+func (_VerifierRegistry *VerifierRegistryCallerSession) Aegis() (common.Address, error) {
+	return _VerifierRegistry.Contract.Aegis(&_VerifierRegistry.CallOpts)
+}
+
 // GetAccuracy is a free data retrieval call binding the contract method 0x783df30a.
 //
 // Solidity: function getAccuracy(address verifier) view returns(uint256 bps)
@@ -395,37 +426,6 @@ func (_VerifierRegistry *VerifierRegistrySession) Owner() (common.Address, error
 // Solidity: function owner() view returns(address)
 func (_VerifierRegistry *VerifierRegistryCallerSession) Owner() (common.Address, error) {
 	return _VerifierRegistry.Contract.Owner(&_VerifierRegistry.CallOpts)
-}
-
-// Quorum is a free data retrieval call binding the contract method 0x1703a018.
-//
-// Solidity: function quorum() view returns(address)
-func (_VerifierRegistry *VerifierRegistryCaller) Quorum(opts *bind.CallOpts) (common.Address, error) {
-	var out []interface{}
-	err := _VerifierRegistry.contract.Call(opts, &out, "quorum")
-
-	if err != nil {
-		return *new(common.Address), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
-
-	return out0, err
-
-}
-
-// Quorum is a free data retrieval call binding the contract method 0x1703a018.
-//
-// Solidity: function quorum() view returns(address)
-func (_VerifierRegistry *VerifierRegistrySession) Quorum() (common.Address, error) {
-	return _VerifierRegistry.Contract.Quorum(&_VerifierRegistry.CallOpts)
-}
-
-// Quorum is a free data retrieval call binding the contract method 0x1703a018.
-//
-// Solidity: function quorum() view returns(address)
-func (_VerifierRegistry *VerifierRegistryCallerSession) Quorum() (common.Address, error) {
-	return _VerifierRegistry.Contract.Quorum(&_VerifierRegistry.CallOpts)
 }
 
 // StakeOf is a free data retrieval call binding the contract method 0x42623360.
@@ -722,6 +722,27 @@ func (_VerifierRegistry *VerifierRegistryTransactorSession) RequestWithdraw() (*
 	return _VerifierRegistry.Contract.RequestWithdraw(&_VerifierRegistry.TransactOpts)
 }
 
+// SetAegis is a paid mutator transaction binding the contract method 0xd1d63601.
+//
+// Solidity: function setAegis(address _aegis) returns()
+func (_VerifierRegistry *VerifierRegistryTransactor) SetAegis(opts *bind.TransactOpts, _aegis common.Address) (*types.Transaction, error) {
+	return _VerifierRegistry.contract.Transact(opts, "setAegis", _aegis)
+}
+
+// SetAegis is a paid mutator transaction binding the contract method 0xd1d63601.
+//
+// Solidity: function setAegis(address _aegis) returns()
+func (_VerifierRegistry *VerifierRegistrySession) SetAegis(_aegis common.Address) (*types.Transaction, error) {
+	return _VerifierRegistry.Contract.SetAegis(&_VerifierRegistry.TransactOpts, _aegis)
+}
+
+// SetAegis is a paid mutator transaction binding the contract method 0xd1d63601.
+//
+// Solidity: function setAegis(address _aegis) returns()
+func (_VerifierRegistry *VerifierRegistryTransactorSession) SetAegis(_aegis common.Address) (*types.Transaction, error) {
+	return _VerifierRegistry.Contract.SetAegis(&_VerifierRegistry.TransactOpts, _aegis)
+}
+
 // SetINftContract is a paid mutator transaction binding the contract method 0x7ce4611f.
 //
 // Solidity: function setINftContract(address _iNft) returns()
@@ -762,27 +783,6 @@ func (_VerifierRegistry *VerifierRegistrySession) SetMinStake(_minStake *big.Int
 // Solidity: function setMinStake(uint256 _minStake) returns()
 func (_VerifierRegistry *VerifierRegistryTransactorSession) SetMinStake(_minStake *big.Int) (*types.Transaction, error) {
 	return _VerifierRegistry.Contract.SetMinStake(&_VerifierRegistry.TransactOpts, _minStake)
-}
-
-// SetQuorum is a paid mutator transaction binding the contract method 0xb0774158.
-//
-// Solidity: function setQuorum(address _quorum) returns()
-func (_VerifierRegistry *VerifierRegistryTransactor) SetQuorum(opts *bind.TransactOpts, _quorum common.Address) (*types.Transaction, error) {
-	return _VerifierRegistry.contract.Transact(opts, "setQuorum", _quorum)
-}
-
-// SetQuorum is a paid mutator transaction binding the contract method 0xb0774158.
-//
-// Solidity: function setQuorum(address _quorum) returns()
-func (_VerifierRegistry *VerifierRegistrySession) SetQuorum(_quorum common.Address) (*types.Transaction, error) {
-	return _VerifierRegistry.Contract.SetQuorum(&_VerifierRegistry.TransactOpts, _quorum)
-}
-
-// SetQuorum is a paid mutator transaction binding the contract method 0xb0774158.
-//
-// Solidity: function setQuorum(address _quorum) returns()
-func (_VerifierRegistry *VerifierRegistryTransactorSession) SetQuorum(_quorum common.Address) (*types.Transaction, error) {
-	return _VerifierRegistry.Contract.SetQuorum(&_VerifierRegistry.TransactOpts, _quorum)
 }
 
 // Slash is a paid mutator transaction binding the contract method 0xbfac5990.
@@ -846,6 +846,150 @@ func (_VerifierRegistry *VerifierRegistrySession) Withdraw() (*types.Transaction
 // Solidity: function withdraw() returns()
 func (_VerifierRegistry *VerifierRegistryTransactorSession) Withdraw() (*types.Transaction, error) {
 	return _VerifierRegistry.Contract.Withdraw(&_VerifierRegistry.TransactOpts)
+}
+
+// VerifierRegistryAegisSetIterator is returned from FilterAegisSet and is used to iterate over the raw logs and unpacked data for AegisSet events raised by the VerifierRegistry contract.
+type VerifierRegistryAegisSetIterator struct {
+	Event *VerifierRegistryAegisSet // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *VerifierRegistryAegisSetIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(VerifierRegistryAegisSet)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(VerifierRegistryAegisSet)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *VerifierRegistryAegisSetIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *VerifierRegistryAegisSetIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// VerifierRegistryAegisSet represents a AegisSet event raised by the VerifierRegistry contract.
+type VerifierRegistryAegisSet struct {
+	Aegis common.Address
+	Raw   types.Log // Blockchain specific contextual infos
+}
+
+// FilterAegisSet is a free log retrieval operation binding the contract event 0x8a4f944711cc731fe00e14afd079cdcbd5d5b473d1215f5c32f05f9ee622a4f0.
+//
+// Solidity: event AegisSet(address indexed aegis)
+func (_VerifierRegistry *VerifierRegistryFilterer) FilterAegisSet(opts *bind.FilterOpts, aegis []common.Address) (*VerifierRegistryAegisSetIterator, error) {
+
+	var aegisRule []interface{}
+	for _, aegisItem := range aegis {
+		aegisRule = append(aegisRule, aegisItem)
+	}
+
+	logs, sub, err := _VerifierRegistry.contract.FilterLogs(opts, "AegisSet", aegisRule)
+	if err != nil {
+		return nil, err
+	}
+	return &VerifierRegistryAegisSetIterator{contract: _VerifierRegistry.contract, event: "AegisSet", logs: logs, sub: sub}, nil
+}
+
+// WatchAegisSet is a free log subscription operation binding the contract event 0x8a4f944711cc731fe00e14afd079cdcbd5d5b473d1215f5c32f05f9ee622a4f0.
+//
+// Solidity: event AegisSet(address indexed aegis)
+func (_VerifierRegistry *VerifierRegistryFilterer) WatchAegisSet(opts *bind.WatchOpts, sink chan<- *VerifierRegistryAegisSet, aegis []common.Address) (event.Subscription, error) {
+
+	var aegisRule []interface{}
+	for _, aegisItem := range aegis {
+		aegisRule = append(aegisRule, aegisItem)
+	}
+
+	logs, sub, err := _VerifierRegistry.contract.WatchLogs(opts, "AegisSet", aegisRule)
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(VerifierRegistryAegisSet)
+				if err := _VerifierRegistry.contract.UnpackLog(event, "AegisSet", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseAegisSet is a log parse operation binding the contract event 0x8a4f944711cc731fe00e14afd079cdcbd5d5b473d1215f5c32f05f9ee622a4f0.
+//
+// Solidity: event AegisSet(address indexed aegis)
+func (_VerifierRegistry *VerifierRegistryFilterer) ParseAegisSet(log types.Log) (*VerifierRegistryAegisSet, error) {
+	event := new(VerifierRegistryAegisSet)
+	if err := _VerifierRegistry.contract.UnpackLog(event, "AegisSet", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }
 
 // VerifierRegistryMinStakeUpdatedIterator is returned from FilterMinStakeUpdated and is used to iterate over the raw logs and unpacked data for MinStakeUpdated events raised by the VerifierRegistry contract.
@@ -1130,150 +1274,6 @@ func (_VerifierRegistry *VerifierRegistryFilterer) WatchOwnershipTransferred(opt
 func (_VerifierRegistry *VerifierRegistryFilterer) ParseOwnershipTransferred(log types.Log) (*VerifierRegistryOwnershipTransferred, error) {
 	event := new(VerifierRegistryOwnershipTransferred)
 	if err := _VerifierRegistry.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
-		return nil, err
-	}
-	event.Raw = log
-	return event, nil
-}
-
-// VerifierRegistryQuorumSetIterator is returned from FilterQuorumSet and is used to iterate over the raw logs and unpacked data for QuorumSet events raised by the VerifierRegistry contract.
-type VerifierRegistryQuorumSetIterator struct {
-	Event *VerifierRegistryQuorumSet // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *VerifierRegistryQuorumSetIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(VerifierRegistryQuorumSet)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(VerifierRegistryQuorumSet)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *VerifierRegistryQuorumSetIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *VerifierRegistryQuorumSetIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// VerifierRegistryQuorumSet represents a QuorumSet event raised by the VerifierRegistry contract.
-type VerifierRegistryQuorumSet struct {
-	Quorum common.Address
-	Raw    types.Log // Blockchain specific contextual infos
-}
-
-// FilterQuorumSet is a free log retrieval operation binding the contract event 0x0b1170e4522b13d041892f25c7855f2f9b35dbfca854ff702a7e9ed406d61bb3.
-//
-// Solidity: event QuorumSet(address indexed quorum)
-func (_VerifierRegistry *VerifierRegistryFilterer) FilterQuorumSet(opts *bind.FilterOpts, quorum []common.Address) (*VerifierRegistryQuorumSetIterator, error) {
-
-	var quorumRule []interface{}
-	for _, quorumItem := range quorum {
-		quorumRule = append(quorumRule, quorumItem)
-	}
-
-	logs, sub, err := _VerifierRegistry.contract.FilterLogs(opts, "QuorumSet", quorumRule)
-	if err != nil {
-		return nil, err
-	}
-	return &VerifierRegistryQuorumSetIterator{contract: _VerifierRegistry.contract, event: "QuorumSet", logs: logs, sub: sub}, nil
-}
-
-// WatchQuorumSet is a free log subscription operation binding the contract event 0x0b1170e4522b13d041892f25c7855f2f9b35dbfca854ff702a7e9ed406d61bb3.
-//
-// Solidity: event QuorumSet(address indexed quorum)
-func (_VerifierRegistry *VerifierRegistryFilterer) WatchQuorumSet(opts *bind.WatchOpts, sink chan<- *VerifierRegistryQuorumSet, quorum []common.Address) (event.Subscription, error) {
-
-	var quorumRule []interface{}
-	for _, quorumItem := range quorum {
-		quorumRule = append(quorumRule, quorumItem)
-	}
-
-	logs, sub, err := _VerifierRegistry.contract.WatchLogs(opts, "QuorumSet", quorumRule)
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(VerifierRegistryQuorumSet)
-				if err := _VerifierRegistry.contract.UnpackLog(event, "QuorumSet", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// ParseQuorumSet is a log parse operation binding the contract event 0x0b1170e4522b13d041892f25c7855f2f9b35dbfca854ff702a7e9ed406d61bb3.
-//
-// Solidity: event QuorumSet(address indexed quorum)
-func (_VerifierRegistry *VerifierRegistryFilterer) ParseQuorumSet(log types.Log) (*VerifierRegistryQuorumSet, error) {
-	event := new(VerifierRegistryQuorumSet)
-	if err := _VerifierRegistry.contract.UnpackLog(event, "QuorumSet", log); err != nil {
 		return nil, err
 	}
 	event.Raw = log
