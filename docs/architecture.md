@@ -127,3 +127,61 @@ costly dishonesty.
 - Slashing for non-revealers
 - ZK-proof of verifier execution
 - Cross-chain verification beyond Base + 0G
+
+## On-chain components
+
+### `AegisContract.sol`
+
+```solidity
+struct Job {
+    address client;
+    address executor;
+    uint256 executorReimbursement; // refunds executor working capital on PASS
+    uint256 executorFee;           // service fee paid to executor on PASS
+    uint256 verifierBounty;        // paid to majority revealing verifiers regardless
+    bytes32 specHash;
+    bytes32 txHash;
+    bytes32 reportedOutcomeHash;
+    uint64  claimDeadline;
+    uint64  commitDeadline;
+    uint64  revealDeadline;
+    Status  status;
+}
+```
+
+Constructor takes `treasury` address. Receives slashed minority-verifier
+funds. Executor FAIL slash splits 50/50 between client (compensation) and
+majority verifiers (bonus).
+
+Public functions: `postJob(specHash, executor, reimbursement, fee, bounty)`,
+`submitClaim`, `commitVote`, `revealVote`, `settle`, `cancelStaleJob`.
+
+Critical invariants:
+
+1. A job settles at most once.
+2. Each verifier commits at most once and reveals at most once per job.
+3. A reveal that doesn't hash to the commit is rejected.
+4. Settlement math: PASS wins iff `passReveals * 3 ≥ (passReveals + failReveals) * 2`.
+5. Stake slashing can never underflow.
+6. ReentrancyGuard on settle.
+
+### `VerifierRegistry.sol` — bonded-participant registry
+
+Tracks each registered participant's stake, accuracy, iNFT pointer, active
+status. **Same registry holds verifiers (100 USDC min) and executors
+(500 USDC bond).** They differ only by stake amount and operational role
+off-chain; on-chain they're both bonded participants.
+
+`slash(addr, amount, recipient)` decrements the staker's balance AND
+transfers USDC out of the registry to `recipient`. Recipient is:
+
+- `treasury` for verifier dissent
+- `client` for half of executor FAIL slash
+- each majority verifier (split equally) for the other half
+
+### `VerifierINFT.sol` — ERC-7857 verifier identity
+
+Step 6. ERC-721 + ERC-7857 extension. Each verifier mints one iNFT during
+registration. Owns `agent_card_uri` (JSON on 0G Storage),
+`encrypted_metadata_uri` (placeholder), `controller` (mutable EOA).
+Transferable — accuracy history persists across operator changes.
