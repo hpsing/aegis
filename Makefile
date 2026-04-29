@@ -1,5 +1,6 @@
 .PHONY: build vet test cover staticcheck fmt-check fresh \
-        contracts-build contracts-test contracts-clean contracts-fresh \
+        contracts-build contracts-test contracts-clean contracts-fresh abigen \
+        deploy-local deploy-og \
         setup-axl run-axl stop-axl
 
 build:
@@ -14,18 +15,6 @@ test:
 fresh:
 	go clean -cache
 	go build ./...
-
-contracts-build:
-	cd contracts && forge build
-
-contracts-test:
-	cd contracts && forge test
-
-contracts-clean:
-	cd contracts && forge clean
-
-contracts-fresh:
-	cd contracts && forge clean && forge build
 
 cover:
 	go test -cover ./internal/...
@@ -45,3 +34,45 @@ run-axl:
 
 stop-axl:
 	sh scripts/stop-axl.sh
+
+
+contracts-build:
+	cd contracts && forge build
+
+contracts-test:
+	cd contracts && forge test
+
+contracts-clean:
+	cd contracts && forge clean
+
+contracts-fresh:
+	cd contracts && forge clean && forge build
+
+# Deploy to a local Anvil node (run `anvil` in another shell first).
+# Uses Anvil's first default account.
+ANVIL_RPC ?= http://127.0.0.1:8545
+ANVIL_PK  ?= 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+deploy-local:
+	cd contracts && forge script script/DeployLocal.s.sol:DeployLocal \
+		--broadcast --rpc-url $(ANVIL_RPC) --private-key $(ANVIL_PK)
+
+# Deploy to 0G Galileo testnet. Requires:
+#   OG_GALILEO_RPC, DEPLOYER_PRIVATE_KEY, TREASURY_ADDRESS
+#   USDC_ADDRESS (optional — if unset, deploys MockUSDC)
+deploy-og:
+	cd contracts && forge script script/DeployToOG.s.sol:DeployToOG \
+		--broadcast --rpc-url $$OG_GALILEO_RPC \
+		--private-key $$DEPLOYER_PRIVATE_KEY
+
+# Regenerate abigen bindings from contracts/out/. Run after changing
+# contract ABIs.
+abigen:
+	cd contracts && forge build
+	mkdir -p internal/aegis
+	jq '.abi' contracts/out/AegisContract.sol/AegisContract.json > /tmp/aegis.abi.json
+	jq '.abi' contracts/out/VerifierRegistry.sol/VerifierRegistry.json > /tmp/registry.abi.json
+	jq '.abi' contracts/out/MockUSDC.sol/MockUSDC.json > /tmp/mockusdc.abi.json
+	abigen --abi /tmp/aegis.abi.json --pkg aegis --type AegisContract --out internal/aegis/aegis_contract.go
+	abigen --abi /tmp/registry.abi.json --pkg aegis --type VerifierRegistry --out internal/aegis/verifier_registry.go
+	abigen --abi /tmp/mockusdc.abi.json --pkg aegis --type MockUSDC --out internal/aegis/mock_usdc.go
+	go build ./...
