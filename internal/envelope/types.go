@@ -2,7 +2,7 @@ package envelope
 
 // ClaimSpec is the workload the executor claims to have performed.
 type ClaimSpec struct {
-	Action                  string `json:"action"` // "uniswap_v3_swap" only in step 1-4
+	Action                  string `json:"action"` // "uniswap_v3_swap"
 	ChainID                 int64  `json:"chain_id"`
 	TokenIn                 string `json:"token_in"`  // EIP-55 address
 	TokenOut                string `json:"token_out"` // EIP-55 address
@@ -13,7 +13,7 @@ type ClaimSpec struct {
 	FeeTier                 int    `json:"fee_tier"`
 }
 
-// ReportedResult is the executor's self-reported outcome.
+// ReportedResult is the executor's self-reported outcome of performing the ClaimSpec.
 type ReportedResult struct {
 	TxHash      string `json:"tx_hash"`
 	ChainID     int64  `json:"chain_id"`

@@ -1,10 +1,3 @@
-// Package envelope owns the wire format every Quorum agent speaks: canonical
-// JSON, secp256k1 signing (matching Ethereum's signing scheme), the
-// envelope wrapper, and the typed payload structs.
-//
-// The wire format is FROZEN at Version=1. Any change to the JSON shape
-// requires bumping Version. Internal signing-scheme changes bump
-// SigVersion (a Go-internal const) without touching the wire shape.
 package envelope
 
 import (
@@ -16,8 +9,7 @@ import (
 
 // Canonicalize returns deterministic JSON: sorted object keys, no extraneous
 // whitespace. The on-chain side computes keccak256 of these same bytes,
-// so the Go-and-Solidity digests must agree byte-for-byte (see
-// contracts/test/CanonicalDigest.t.sol once step 3 is in).
+// so the Go-and-Solidity digests must agree byte-for-byte.
 func Canonicalize(v any) ([]byte, error) {
 	raw, err := json.Marshal(v)
 	if err != nil {

@@ -1,4 +1,4 @@
-module github.com/hpsing/quorum
+module github.com/hpsing/aegis
 
 go 1.26.2
 
