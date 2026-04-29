@@ -13,6 +13,7 @@
 //
 // export OG_PRIVATE_KEY=xxxx
 // go test -tags=live -timeout=300s -run TestLive_UploadAgentCard -v ./internal/ogstorage/
+// status: https://storagescan-galileo.0g.ai/address/0x7C9DcA2fB05cFc732794CEe846888f3B1D7FE06a
 package ogstorage
 
 import (
