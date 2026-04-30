@@ -51,6 +51,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/hpsing/aegis/internal/axl"
 	"github.com/hpsing/aegis/internal/chain"
 	"github.com/hpsing/aegis/internal/keeperhub"
 	"github.com/hpsing/aegis/internal/ogstorage"
@@ -133,10 +134,19 @@ func main() {
 		iNftID = n
 	}
 
+	axlURL := mustEnv("AXL_NODE_URL")
+	axlClient := axl.NewClient(axlURL)
+	peer, err := axlClient.PeerID(ctx)
+	if err != nil {
+		log.Fatalf("[verifier] AXL: %s unreachable (%v) — start the swarm with scripts/run-axl-swarm.sh first", axlURL, err)
+	}
+	log.Printf("[verifier] AXL: %s peer=%s…", axlURL, peer[:10])
+
 	loop := verifier.NewLoop(verifier.LoopConfig{
 		OnChain:  onchain,
 		SwapRPC:  swapClient,
 		Storage:  storage,
+		AXL:      axlClient,
 		INftID:   iNftID,
 		Corrupt:  *corrupt,
 		LogLabel: logLabel,

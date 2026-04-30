@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/hpsing/aegis/internal/aegis"
+	"github.com/hpsing/aegis/internal/axl"
 	"github.com/hpsing/aegis/internal/chain"
 	"github.com/hpsing/aegis/internal/envelope"
 	"github.com/hpsing/aegis/internal/ogstorage"
@@ -25,6 +27,7 @@ type LoopConfig struct {
 	OnChain    *OnChain          // AegisContract + Registry bindings
 	SwapRPC    chain.EthClient   // chain where the swap happened
 	Storage    ogstorage.Storage // 0G Storage; nil disables post-settlement hooks
+	AXL        *axl.Client       // local AXL daemon
 	INftID     uint64            // verifier's iNFT token id; 0 if not minted yet
 	Corrupt    bool              // adversarial test: invert verdict before commit
 	SkipReveal bool              // censoring test: commit but never reveal
@@ -35,10 +38,11 @@ type LoopConfig struct {
 // crash we lose it (acceptable per step-05 scope). Events come from
 // AegisContract subscriptions, votes go back via OnChain.
 type Loop struct {
-	cfg   LoopConfig
-	mu    sync.Mutex
-	jobs  map[string]*jobState // keyed by jobID.String()
-	stats Stats
+	cfg       LoopConfig
+	mu        sync.Mutex
+	jobs      map[string]*jobState // keyed by jobID.String()
+	stats     Stats
+	specCache map[string][]byte // specHash
 }
 
 // Stats are exposed for tests that want to assert behavior at the end of
@@ -68,7 +72,14 @@ func NewLoop(cfg LoopConfig) *Loop {
 
 // Run subscribes to chain events and processes them. Returns when ctx
 // is cancelled. Subscriptions are torn down cleanly on exit.
+//
+// AXL is required — the verifier sources its claim spec from
+// SpecPublish envelopes and refuses to vote without one. Starting
+// without AXL is a configuration error, not a degraded mode.
 func (l *Loop) Run(ctx context.Context) error {
+	if l.cfg.AXL == nil {
+		return errors.New("verifier: AXL client required (no fallback path)")
+	}
 	posted := make(chan *aegis.AegisContractJobPosted, 16)
 	claimed := make(chan *aegis.AegisContractClaimSubmitted, 16)
 	settled := make(chan *aegis.AegisContractJobSettled, 16)
@@ -91,7 +102,10 @@ func (l *Loop) Run(ctx context.Context) error {
 	}
 	defer subSettled.Unsubscribe()
 
-	l.logf("loop running, addr=%s", l.cfg.OnChain.Address().Hex())
+	// AXL recv loop runs alongside the chain-event loop. Spec/vote
+	// envelopes from peers land in the spec cache + log line.
+	go l.axlRecvLoop(ctx)
+	l.logf("loop running, addr=%s axl=%s", l.cfg.OnChain.Address().Hex(), l.cfg.AXL.BaseURL())
 
 	for {
 		select {
@@ -176,6 +190,15 @@ func (l *Loop) onClaimSubmitted(ctx context.Context, ev *aegis.AegisContractClai
 	l.bump(&l.stats.CommitsLanded)
 	l.logf("commit %s verdict=%v tx=%s attempts=%d", key, verdict, receipt.TxHash.Hex(), receipt.Attempts)
 
+	cHash := commitHash(verdict, nonce, l.cfg.OnChain.Address())
+	l.publishVoteEnvelope(ctx, axl.VotePayload{
+		JobID:      jobID.Uint64(),
+		Verifier:   l.cfg.OnChain.Address().Hex(),
+		Phase:      "commit",
+		CommitHash: "0x" + hex.EncodeToString(cHash[:]),
+		TxHash:     receipt.TxHash.Hex(),
+	}, l.axlPeerList())
+
 	if l.cfg.SkipReveal {
 		l.logf("CENSOR MODE: skipping reveal for job %s", key)
 		return
@@ -227,6 +250,18 @@ func (l *Loop) scheduleReveal(ctx context.Context, jobID *big.Int, job Job) {
 	l.mu.Unlock()
 	l.bump(&l.stats.RevealsLanded)
 	l.logf("reveal %s verdict=%v tx=%s attempts=%d", jobID, st.verdict, receipt.TxHash.Hex(), receipt.Attempts)
+
+	verdict := st.verdict
+	nonceBytes := make([]byte, len(st.nonce))
+	copy(nonceBytes, st.nonce[:])
+	l.publishVoteEnvelope(ctx, axl.VotePayload{
+		JobID:    jobID.Uint64(),
+		Verifier: l.cfg.OnChain.Address().Hex(),
+		Phase:    "reveal",
+		Verdict:  &verdict,
+		Nonce:    "0x" + hex.EncodeToString(nonceBytes),
+		TxHash:   receipt.TxHash.Hex(),
+	}, l.axlPeerList())
 }
 
 // headTimestamp returns the latest block's timestamp (Unix seconds).
@@ -319,19 +354,22 @@ func verdictString(v bool) string {
 	return "FAIL"
 }
 
-// runCheck reconstructs the ExecutionClaim from on-chain state + the
-// reported result hashes, then runs CheckClaim. The "swap chain"
-// EthClient is configured by the caller — production points at Base,
-// local devnet uses a mock.
+// runCheck reconstructs the ExecutionClaim from the AXL-distributed
+// spec + on-chain claim hashes, then runs CheckClaim. The spec is
+// looked up by job.SpecHash in the cache populated by the AXL recv
+// loop (see axl_bridge.go::onSpecPublish). If it hasn't arrived yet,
+// we wait briefly — AXL recv polls on a 1s ticker, and the publisher
+// fans out specs immediately after postJob, so a few seconds is the
+// expected upper bound.
 func (l *Loop) runCheck(
 	ctx context.Context, _ *big.Int, job Job, ev *aegis.AegisContractClaimSubmitted,
 ) (bool, error) {
-	// Reconstruct a synthetic ExecutionClaim from on-chain state. The
-	// Spec is NOT on chain (only its hash is) — for step 5 local mode,
-	// we derive a default spec because we know what the publisher
-	// posts. Step 7 will switch to fetching the spec via 0G Storage.
+	spec, err := l.awaitSpec(ctx, job.SpecHash)
+	if err != nil {
+		return false, err
+	}
 	claim := envelope.ExecutionClaim{
-		Spec:           defaultLocalSpec(),
+		Spec:           spec,
 		ReportedResult: envelope.ReportedResult{TxHash: hexHash(ev.TxHash[:])},
 		ClientAddress:  job.Client.Hex(),
 	}
@@ -343,6 +381,34 @@ func (l *Loop) runCheck(
 		return false, errors.New("abstain")
 	}
 	return res.Verdict == Pass, nil
+}
+
+// awaitSpec resolves the on-chain specHash to a deserialized ClaimSpec
+// from the AXL-populated cache. Polls every 250ms for up to 10s; if
+// the spec never arrives, returns an error so the verifier abstains.
+func (l *Loop) awaitSpec(ctx context.Context, specHash [32]byte) (envelope.ClaimSpec, error) {
+	key := strings.ToLower(hex.EncodeToString(specHash[:]))
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		l.mu.Lock()
+		raw, ok := l.specCache[key]
+		l.mu.Unlock()
+		if ok {
+			var spec envelope.ClaimSpec
+			if err := json.Unmarshal(raw, &spec); err != nil {
+				return envelope.ClaimSpec{}, fmt.Errorf("spec %s: decode: %w", key[:10], err)
+			}
+			return spec, nil
+		}
+		if time.Now().After(deadline) {
+			return envelope.ClaimSpec{}, fmt.Errorf("spec %s: not in AXL cache (publisher silent or AXL down)", key[:10])
+		}
+		select {
+		case <-ctx.Done():
+			return envelope.ClaimSpec{}, ctx.Err()
+		case <-time.After(250 * time.Millisecond):
+		}
+	}
 }
 
 // Stats returns a snapshot. Mostly useful for integration tests.
@@ -366,23 +432,6 @@ func (l *Loop) logf(format string, args ...any) {
 		prefix = "[" + prefix + "]"
 	}
 	log.Printf(prefix+" "+format, args...)
-}
-
-// defaultLocalSpec is the ClaimSpec the local-devnet publisher uses. In
-// production the spec comes from 0G Storage (step 6/7); for now it's
-// hardcoded so verifiers can independently reconstruct it.
-func defaultLocalSpec() envelope.ClaimSpec {
-	return envelope.ClaimSpec{
-		Action:                  "uniswap_v3_swap",
-		ChainID:                 8453,
-		TokenIn:                 "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
-		TokenOut:                "0x4200000000000000000000000000000000000006",
-		AmountIn:                "10000000000",
-		MaxSlippageBps:          30,
-		ReferenceQuoteBlock:     11_999_000,
-		ReferenceQuoteAmountOut: "2848000000000000000",
-		FeeTier:                 500,
-	}
 }
 
 // hexHash takes a 32-byte slice and returns it as 0x-prefixed lowercase hex.

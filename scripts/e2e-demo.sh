@@ -58,6 +58,19 @@ echo "  rpc:       $RPC_URL"
 echo "  logs:      $LOGDIR/"
 echo
 
+echo "=== AXL swarm ==="
+bash scripts/run-axl-swarm.sh
+AXL_PUB_URL="http://127.0.0.1:9002"
+AXL_V1_URL="http://127.0.0.1:9012"
+AXL_V2_URL="http://127.0.0.1:9022"
+AXL_V3_URL="http://127.0.0.1:9032"
+if [[ ! -f .axl/run/peer-v1 || ! -f .axl/run/peer-v2 || ! -f .axl/run/peer-v3 ]]; then
+  echo "ERROR: AXL swarm did not produce peer ids for v1/v2/v3" >&2
+  exit 1
+fi
+AXL_VERIFIER_PEERS="$(cat .axl/run/peer-v1),$(cat .axl/run/peer-v2),$(cat .axl/run/peer-v3)"
+echo "  publisher → ${AXL_VERIFIER_PEERS:0:30}…"
+
 # ---------- 1. preflight ----------
 if [[ "$SKIP_PREFLIGHT" != "1" ]]; then
   echo "=== preflight ==="
@@ -92,6 +105,8 @@ TX_HASH=$(AEGIS_RPC="$RPC_URL" \
   USDC_CONTRACT="$USDC_ADDR" \
   CLIENT_PRIVATE_KEY="$TREASURY_PK" \
   EXECUTOR_ADDRESS="$EXECUTOR_ADDR" \
+  AXL_NODE_URL="$AXL_PUB_URL" \
+  AXL_VERIFIER_PEERS="$AXL_VERIFIER_PEERS" \
   go run ./cmd/publisher 2>&1 | tee "$LOGDIR/publisher.log" | grep -oE '0x[a-f0-9]{64}' | head -1)
 
 if [[ -z "$TX_HASH" ]]; then
@@ -133,6 +148,16 @@ for i in 1 2 3; do
   # = the verifier's own key so uploads are signed by the same identity
   # the verifier reveals as. (Each verifier wallet was funded with 0.05 0G
   # — covers a few uploads.)
+    axl_url=""
+  case "$i" in
+    1) axl_url="$AXL_V1_URL" ;;
+    2) axl_url="$AXL_V2_URL" ;;
+    3) axl_url="$AXL_V3_URL" ;;
+  esac
+  # AXL_REPLICATE_PEERS lets each verifier replicate its vote envelope
+  # to its peers (the OTHER verifier nodes). We send to the union of
+  # peer ids; each verifier ignores its own.
+  axl_replicate="$AXL_VERIFIER_PEERS"
   KEEPERHUB_API_KEY="$vkey" \
   KEEPERHUB_VERIFIER_INDEX="$i" \
   AEGIS_RPC="$RPC_URL" \
@@ -141,6 +166,8 @@ for i in 1 2 3; do
   VERIFIER_PRIVATE_KEY="$vpk" \
   SWAP_RPC="$SWAP_RPC" \
   OG_PRIVATE_KEY="$vpk" \
+  AXL_NODE_URL="$axl_url" \
+  AXL_REPLICATE_PEERS="$axl_replicate" \
   go run ./cmd/verifier --label "v$i" >"$LOGDIR/verifier-$i.log" 2>&1 &
   pid=$!
   VPIDS+=("$pid")
@@ -192,63 +219,101 @@ read_status() {
   echo "$raw" | tail -1 | tr -d ' '
 }
 
+read_reveals() {
+  cast call "$AEGIS_ADDR" "revealCount(uint256)(uint256)" "$JOB_ID" --rpc-url "$RPC_URL" 2>/dev/null | head -1 | awk '{print $1}'
+}
+
 show_progress() {
   local s; s=$(read_status)
   local label; label=$(status_label "$s")
-  local nrev; nrev=$(cast call "$AEGIS_ADDR" "revealCount(uint256)(uint256)" "$JOB_ID" --rpc-url "$RPC_URL" 2>/dev/null | head -1 | awk '{print $1}')
+  local nrev; nrev=$(read_reveals)
   echo "  job status=$label  reveals=${nrev:-0}"
 }
 
-echo "=== watching commit + reveal phases (≈10 min) ==="
+# Wait for all 3 reveals to land before calling settle. Short-circuits
+# once revealCount==3 instead of grinding through the full 70s window
+# every run. Caps at ~10 min as a safety net for chain stalls.
+echo "=== watching commit + reveal phases (until reveals=3, max 600s) ==="
 echo "  tail logs in another terminal: tail -f $LOGDIR/verifier-*.log"
-for elapsed in 10 20 30 40 50 60 70; do
+START_TS=$(date +%s)
+elapsed=0
+while (( elapsed < 600 )); do
   sleep 10
+  elapsed=$(( $(date +%s) - START_TS ))
   printf -- "--- t+%ds ---\n" "$elapsed"
   show_progress
+  nrev=$(read_reveals)
+  if [[ "${nrev:-0}" == "3" ]]; then
+    echo "  all 3 reveals landed — proceeding to settle"
+    break
+  fi
 done
 
 
 # ---------- 6. settle ----------
 echo
 echo "=== calling settle ==="
-SETTLE_OUT=$(cast send "$AEGIS_ADDR" "settle(uint256)" "$JOB_ID" \
-  --rpc-url "$RPC_URL" --private-key "$TREASURY_PK" --legacy 2>&1)
-SETTLE_TX=$(echo "$SETTLE_OUT" | grep -oE '0x[a-f0-9]{64}' | head -1)
-echo "$SETTLE_OUT" | tail -3
-sleep 8
+# 0G Galileo's RPC frequently returns partial/null responses for cast
+# send (no transactionHash field). Don't trust its stdout; treat the
+# call as best-effort and recover the real tx hash from the JobSettled
+# event log below.
+cast send "$AEGIS_ADDR" "settle(uint256)" "$JOB_ID" \
+  --rpc-url "$RPC_URL" --private-key "$TREASURY_PK" --legacy >/dev/null 2>&1 || true
+echo "  settle dispatched — waiting for JobSettled event..."
 
-# ---------- 7. event extraction (commits, reveals) ----------
+# ---------- 7. event extraction (commits, reveals, settle) ----------
 EXPLORER="${EXPLORER:-https://chainscan-galileo.0g.ai}"
 
 # event signatures
 COMMIT_SIG=$(cast keccak "VoteCommitted(uint256,address,bytes32)")
 REVEAL_SIG=$(cast keccak "VoteRevealed(uint256,address,bool)")
+SETTLE_SIG=$(cast keccak "JobSettled(uint256,bool,uint256,uint256)")
 JOB_TOPIC=$(printf '0x%064x' "$JOB_ID")
 
-# Scan from the postJob block (captured at step 2) to head. Anchoring on the
-# job's actual block guarantees we cover its full lifecycle regardless of
-# wall-clock demo length, vs. a fixed `head - N` window that races the demo.
-HEAD_HEX=$(cast block-number --rpc-url "$RPC_URL" 2>/dev/null)
-HEAD_DEC=$((HEAD_HEX))
-FROM_BLOCK=${POST_BLOCK_DEC:-$((HEAD_DEC - 600))}
-[[ $FROM_BLOCK -lt 0 ]] && FROM_BLOCK=0
-
-echo
-echo "scanning blocks $FROM_BLOCK..$HEAD_DEC for VoteCommitted/VoteRevealed (jobId=$JOB_ID)..."
-
-# 0G's eth_getLogs is finicky with the (--address + topics) combo: filtering
-# by address sometimes returns empty even when the events exist. Topic-only
-# filtering (sig + jobId) is reliable; we re-check the address client-side.
-logs_for() {
-  local sig="$1"
+# logs_for_range scans a fixed range. 0G's eth_getLogs is finicky with the
+# (--address + topics) combo: filtering by address sometimes returns empty
+# even when the events exist. Topic-only filtering (sig + jobId) is
+# reliable; we re-check the address client-side.
+logs_for_range() {
+  local sig="$1" from="$2" to="$3"
   cast logs --rpc-url "$RPC_URL" \
-    --from-block "$FROM_BLOCK" --to-block "$HEAD_DEC" \
+    --from-block "$from" --to-block "$to" \
     "$sig" "$JOB_TOPIC" --json 2>/dev/null \
     | jq --arg a "$AEGIS_ADDR" '[.[] | select((.address // "") | ascii_downcase == ($a | ascii_downcase))]'
 }
 
-COMMIT_LOGS=$(logs_for "$COMMIT_SIG")
-REVEAL_LOGS=$(logs_for "$REVEAL_SIG")
+# Poll for JobSettled up to ~90s. Once it lands, anchor the scan window
+# to its block so the upper bound covers settle and we know exactly when
+# to read commits/reveals.
+SETTLE_TX=""
+SETTLE_BLOCK=""
+for _ in $(seq 1 18); do
+  sleep 5
+  HEAD_HEX=$(cast block-number --rpc-url "$RPC_URL" 2>/dev/null)
+  HEAD_DEC=$((HEAD_HEX))
+  FROM_BLOCK=${POST_BLOCK_DEC:-$((HEAD_DEC - 600))}
+  [[ $FROM_BLOCK -lt 0 ]] && FROM_BLOCK=0
+  SETTLE_LOGS=$(logs_for_range "$SETTLE_SIG" "$FROM_BLOCK" "$HEAD_DEC")
+  SETTLE_TX=$(echo "$SETTLE_LOGS" | jq -r '.[0].transactionHash // empty')
+  SETTLE_BLOCK=$(echo "$SETTLE_LOGS" | jq -r '.[0].blockNumber // empty')
+  if [[ -n "$SETTLE_TX" ]]; then
+    break
+  fi
+done
+
+if [[ -z "$SETTLE_TX" ]]; then
+  echo "  WARN: JobSettled not found within 90s. Falling back to head."
+  HEAD_HEX=$(cast block-number --rpc-url "$RPC_URL" 2>/dev/null)
+  HEAD_DEC=$((HEAD_HEX))
+  FROM_BLOCK=${POST_BLOCK_DEC:-$((HEAD_DEC - 600))}
+  [[ $FROM_BLOCK -lt 0 ]] && FROM_BLOCK=0
+fi
+
+echo
+echo "scanning blocks $FROM_BLOCK..$HEAD_DEC for VoteCommitted/VoteRevealed (jobId=$JOB_ID)..."
+
+COMMIT_LOGS=$(logs_for_range "$COMMIT_SIG" "$FROM_BLOCK" "$HEAD_DEC")
+REVEAL_LOGS=$(logs_for_range "$REVEAL_SIG" "$FROM_BLOCK" "$HEAD_DEC")
 
 # pull out (verifier, txHash) pairs
 parse_logs() {
@@ -260,13 +325,22 @@ REVEALS=$(parse_logs "$REVEAL_LOGS")
 
 # Proof-bundle roots scraped from verifier logs. The verifier logs each
 # upload as `proof bundle <jobID> -> 0g://0x<64-hex>` (see
-# internal/verifier/loop.go and internal/ogstorage/og_service.go).
+# internal/verifier/loop.go and internal/ogstorage/og_service.go). The
+# root is a 0G Storage merkle root, NOT an EVM tx hash — it lives on
+# the storage layer, viewable via the 0G Storage gateway.
+STORAGE_GATEWAY="${STORAGE_GATEWAY:-https://storagescan-galileo.0g.ai}"
 proofbundle_roots() {
   for i in 1 2 3; do
     local addr root
     addr=$(grep -oE 'addr=0x[a-fA-F0-9]{40}' "$LOGDIR/verifier-$i.log" | head -1 | cut -d= -f2)
     root=$(grep -oE '0g://0x[a-fA-F0-9]{64}' "$LOGDIR/verifier-$i.log" | head -1 | sed 's|^0g://||')
-    echo "  v$i ${addr:-?}  proofbundle_root=${root:-(not found in log; check 0G storage uploads)}"
+    if [[ -n "$root" ]]; then
+      echo "  v$i ${addr:-?}"
+      echo "      root: $root"
+      echo "      view: $STORAGE_GATEWAY/tx/$root"
+    else
+      echo "  v$i ${addr:-?}  (no proofbundle root found in log)"
+    fi
   done
 }
 
@@ -282,8 +356,6 @@ echo "On-chain transactions"
 echo "---------------------"
 echo "  postJob:      $EXPLORER/tx/$TX_HASH"
 EXEC_TX=$(grep -oE 'submitClaim tx=0x[a-f0-9]{64}' "$LOGDIR/executor.log" | head -1 | cut -d= -f2)
-SWAP_TX=$(grep -oE 'tx=0x[a-f0-9]{64} amount_out' "$LOGDIR/executor.log" | head -1 | grep -oE '0x[a-f0-9]{64}')
-[[ -n "$SWAP_TX" ]]   && echo "  swap (synth.): $EXPLORER/tx/$SWAP_TX"
 [[ -n "$EXEC_TX" ]]   && echo "  submitClaim:  $EXPLORER/tx/$EXEC_TX"
 
 echo
@@ -322,7 +394,23 @@ fi
 echo
 echo "0G Storage — ProofBundles"
 echo "-------------------------"
+echo "  (gateway: $STORAGE_GATEWAY — override with STORAGE_GATEWAY=...)"
 proofbundle_roots
+
+echo
+echo "0G Storage — vote-history append entries"
+echo "----------------------------------------"
+for i in 1 2 3; do
+  addr=$(grep -oE 'addr=0x[a-fA-F0-9]{40}' "$LOGDIR/verifier-$i.log" | head -1 | cut -d= -f2)
+  vote_root=$(grep -oE 'storage append job=[0-9]+ entry=0g://0x[a-fA-F0-9]{64}' "$LOGDIR/verifier-$i.log" | head -1 | grep -oE '0x[a-fA-F0-9]{64}')
+  if [[ -n "$vote_root" ]]; then
+    echo "  v$i ${addr:-?}"
+    echo "      root: $vote_root"
+    echo "      view: $STORAGE_GATEWAY/tx/$vote_root"
+  else
+    echo "  v$i ${addr:-?}  (no vote-record append found in log)"
+  fi
+done
 
 echo
 echo "KeeperHub audit trail"
