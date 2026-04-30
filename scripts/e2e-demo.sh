@@ -12,9 +12,9 @@
 #
 # Optional env:
 #   RPC_URL          default https://evmrpc-testnet.0g.ai
-#   AEGIS_ADDR       default 0xeF60Ad6aB86101F3f787C33957649b5c7a9Ca858
-#   USDC_ADDR        default 0xC74c0D2e91B715C89474c8480C812170054ef422
-#   REGISTRY_ADDR    default 0x5ec805A1991ECa4Fb876E86866bc32D9095F1270
+#   AEGIS_ADDR       default 0xa89833fBD1844763cc77C0a3aFaE32697A2F990f
+#   USDC_ADDR        default 0xe9dA98EB0AF68cC48be7F71C29A7Bc5bA7fB45Eb
+#   REGISTRY_ADDR    default 0x50ce23AE35bbe43fFAd0B36FD3F567560b8EfB18
 #   SWAP_RPC         default same as RPC_URL (synthetic-claim mode)
 #   SKIP_PREFLIGHT   set to 1 to skip USDC mint / executor funding
 #   SETTLE_BY        treasury (default) | manual
@@ -36,9 +36,9 @@ set -uo pipefail
 : "${ORG3_API_KEY:?set ORG3_API_KEY}"
 
 RPC_URL="${RPC_URL:-https://evmrpc-testnet.0g.ai}"
-AEGIS_ADDR="${AEGIS_ADDR:-0xeF60Ad6aB86101F3f787C33957649b5c7a9Ca858}"
-USDC_ADDR="${USDC_ADDR:-0xC74c0D2e91B715C89474c8480C812170054ef422}"
-REGISTRY_ADDR="${REGISTRY_ADDR:-0x5ec805A1991ECa4Fb876E86866bc32D9095F1270}"
+AEGIS_ADDR="${AEGIS_ADDR:-0xa89833fBD1844763cc77C0a3aFaE32697A2F990f}"
+USDC_ADDR="${USDC_ADDR:-0xe9dA98EB0AF68cC48be7F71C29A7Bc5bA7fB45Eb}"
+REGISTRY_ADDR="${REGISTRY_ADDR:-0x50ce23AE35bbe43fFAd0B36FD3F567560b8EfB18}"
 SWAP_RPC="${SWAP_RPC:-$RPC_URL}"
 SKIP_PREFLIGHT="${SKIP_PREFLIGHT:-0}"
 
@@ -104,9 +104,14 @@ echo "  waiting 8s for receipt..."
 sleep 8
 
 JOB_POSTED_SIG=$(cast keccak "JobPosted(uint256,address,address,bytes32,uint256,uint256,uint256)")
-JOB_ID_HEX=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json 2>/dev/null \
+RECEIPT_JSON=$(cast receipt "$TX_HASH" --rpc-url "$RPC_URL" --json 2>/dev/null)
+JOB_ID_HEX=$(echo "$RECEIPT_JSON" \
   | jq -r --arg sig "$JOB_POSTED_SIG" '.logs[]? | select(.topics[0] == $sig) | .topics[1]' \
   | head -1)
+# Capture postJob block — used later as FROM_BLOCK for the commit/reveal log
+# scan so we always cover this job's full lifecycle regardless of demo length.
+POST_BLOCK_HEX=$(echo "$RECEIPT_JSON" | jq -r '.blockNumber // empty')
+POST_BLOCK_DEC=$((POST_BLOCK_HEX))
 
 if [[ -z "$JOB_ID_HEX" ]]; then
   echo "  ERROR: JobPosted event not found in receipt. Inspect via:"
@@ -114,7 +119,7 @@ if [[ -z "$JOB_ID_HEX" ]]; then
   exit 1
 fi
 JOB_ID=$(printf '%d' "$JOB_ID_HEX")
-echo "  JOB_ID=$JOB_ID"
+echo "  JOB_ID=$JOB_ID  postJob_block=$POST_BLOCK_DEC"
 echo
 
 # ---------- 3. spawn 3 verifiers (KH-routed) ----------
@@ -196,33 +201,139 @@ show_progress() {
 
 echo "=== watching commit + reveal phases (≈10 min) ==="
 echo "  tail logs in another terminal: tail -f $LOGDIR/verifier-*.log"
-for elapsed in 60 120 180 240 300 360 420 480 540 600 660 720; do
-  sleep 60
+for elapsed in 10 20 30 40 50 60 70; do
+  sleep 10
   printf -- "--- t+%ds ---\n" "$elapsed"
   show_progress
 done
 
+
 # ---------- 6. settle ----------
 echo
 echo "=== calling settle ==="
-cast send "$AEGIS_ADDR" "settle(uint256)" "$JOB_ID" \
-  --rpc-url "$RPC_URL" --private-key "$TREASURY_PK" --legacy 2>&1 | tail -5
+SETTLE_OUT=$(cast send "$AEGIS_ADDR" "settle(uint256)" "$JOB_ID" \
+  --rpc-url "$RPC_URL" --private-key "$TREASURY_PK" --legacy 2>&1)
+SETTLE_TX=$(echo "$SETTLE_OUT" | grep -oE '0x[a-f0-9]{64}' | head -1)
+echo "$SETTLE_OUT" | tail -3
 sleep 8
 
-# ---------- 7. final state ----------
-echo
-echo "============================================================"
-echo "Final state"
-echo "============================================================"
-show_progress
+# ---------- 7. event extraction (commits, reveals) ----------
+EXPLORER="${EXPLORER:-https://chainscan-galileo.0g.ai}"
+
+# event signatures
+COMMIT_SIG=$(cast keccak "VoteCommitted(uint256,address,bytes32)")
+REVEAL_SIG=$(cast keccak "VoteRevealed(uint256,address,bool)")
+JOB_TOPIC=$(printf '0x%064x' "$JOB_ID")
+
+# Scan from the postJob block (captured at step 2) to head. Anchoring on the
+# job's actual block guarantees we cover its full lifecycle regardless of
+# wall-clock demo length, vs. a fixed `head - N` window that races the demo.
+HEAD_HEX=$(cast block-number --rpc-url "$RPC_URL" 2>/dev/null)
+HEAD_DEC=$((HEAD_HEX))
+FROM_BLOCK=${POST_BLOCK_DEC:-$((HEAD_DEC - 600))}
+[[ $FROM_BLOCK -lt 0 ]] && FROM_BLOCK=0
 
 echo
-echo "  KH dashboards: https://app.keeperhub.com  (sign in with each org)"
-echo "  logs:          $LOGDIR/"
-echo "  job id:        $JOB_ID"
+echo "scanning blocks $FROM_BLOCK..$HEAD_DEC for VoteCommitted/VoteRevealed (jobId=$JOB_ID)..."
+
+# 0G's eth_getLogs is finicky with the (--address + topics) combo: filtering
+# by address sometimes returns empty even when the events exist. Topic-only
+# filtering (sig + jobId) is reliable; we re-check the address client-side.
+logs_for() {
+  local sig="$1"
+  cast logs --rpc-url "$RPC_URL" \
+    --from-block "$FROM_BLOCK" --to-block "$HEAD_DEC" \
+    "$sig" "$JOB_TOPIC" --json 2>/dev/null \
+    | jq --arg a "$AEGIS_ADDR" '[.[] | select((.address // "") | ascii_downcase == ($a | ascii_downcase))]'
+}
+
+COMMIT_LOGS=$(logs_for "$COMMIT_SIG")
+REVEAL_LOGS=$(logs_for "$REVEAL_SIG")
+
+# pull out (verifier, txHash) pairs
+parse_logs() {
+  echo "$1" | jq -r '.[]? | "\(.topics[2] | sub("^0x000000000000000000000000"; "0x"))  \(.transactionHash)"'
+}
+
+COMMITS=$(parse_logs "$COMMIT_LOGS")
+REVEALS=$(parse_logs "$REVEAL_LOGS")
+
+# Proof-bundle roots scraped from verifier logs. The verifier logs each
+# upload as `proof bundle <jobID> -> 0g://0x<64-hex>` (see
+# internal/verifier/loop.go and internal/ogstorage/og_service.go).
+proofbundle_roots() {
+  for i in 1 2 3; do
+    local addr root
+    addr=$(grep -oE 'addr=0x[a-fA-F0-9]{40}' "$LOGDIR/verifier-$i.log" | head -1 | cut -d= -f2)
+    root=$(grep -oE '0g://0x[a-fA-F0-9]{64}' "$LOGDIR/verifier-$i.log" | head -1 | sed 's|^0g://||')
+    echo "  v$i ${addr:-?}  proofbundle_root=${root:-(not found in log; check 0G storage uploads)}"
+  done
+}
+
+# ---------- 8. final state ----------
 echo
-echo "Last 5 lines per verifier log:"
-for i in 1 2 3; do
-  echo "--- verifier-$i ---"
-  tail -5 "$LOGDIR/verifier-$i.log" | sed 's/^/  /'
-done
+echo "============================================================"
+echo "Final state — Job $JOB_ID"
+echo "============================================================"
+show_progress
+echo
+
+echo "On-chain transactions"
+echo "---------------------"
+echo "  postJob:      $EXPLORER/tx/$TX_HASH"
+EXEC_TX=$(grep -oE 'submitClaim tx=0x[a-f0-9]{64}' "$LOGDIR/executor.log" | head -1 | cut -d= -f2)
+SWAP_TX=$(grep -oE 'tx=0x[a-f0-9]{64} amount_out' "$LOGDIR/executor.log" | head -1 | grep -oE '0x[a-f0-9]{64}')
+[[ -n "$SWAP_TX" ]]   && echo "  swap (synth.): $EXPLORER/tx/$SWAP_TX"
+[[ -n "$EXEC_TX" ]]   && echo "  submitClaim:  $EXPLORER/tx/$EXEC_TX"
+
+echo
+echo "Verifier commits (msg.sender = each verifier's own wallet)"
+echo "---------------------"
+if [[ -n "$COMMITS" ]]; then
+  while IFS=' ' read -r addr txh; do
+    [[ -z "$addr" ]] && continue
+    echo "  $addr  $EXPLORER/tx/$txh"
+  done <<< "$COMMITS"
+else
+  echo "  (no logs found in scanned range)"
+fi
+
+echo
+echo "Verifier reveals"
+echo "---------------------"
+if [[ -n "$REVEALS" ]]; then
+  while IFS=' ' read -r addr txh; do
+    [[ -z "$addr" ]] && continue
+    echo "  $addr  $EXPLORER/tx/$txh"
+  done <<< "$REVEALS"
+else
+  echo "  (no logs found in scanned range)"
+fi
+
+echo
+echo "Settle"
+echo "---------------------"
+if [[ -n "$SETTLE_TX" ]]; then
+  echo "  settle:       $EXPLORER/tx/$SETTLE_TX"
+else
+  echo "  (settle tx hash not captured)"
+fi
+
+echo
+echo "0G Storage — ProofBundles"
+echo "-------------------------"
+proofbundle_roots
+
+echo
+echo "KeeperHub audit trail"
+echo "---------------------"
+echo "  Each commit + reveal fires execute_workflow asynchronously into"
+echo "  KH for audit. Sign in to each org's dashboard to inspect:"
+echo "    org-1 (verifier-1):  https://app.keeperhub.com/  → workflow 'aegis-commit-vote', 'aegis-reveal-vote'"
+echo "    org-2 (verifier-2):  https://app.keeperhub.com/  → same"
+echo "    org-3 (verifier-3):  https://app.keeperhub.com/  → same"
+echo "  Each successful job emits 6 KH workflow invocations (3 commit + 3 reveal)."
+
+echo
+echo "Logs: $LOGDIR/"
+echo "  publisher.log  executor.log  verifier-{1,2,3}.log"

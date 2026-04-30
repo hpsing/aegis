@@ -32,9 +32,13 @@ import {AegisMath} from "./lib/AegisMath.sol";
 contract AegisContract is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
-    uint64 public constant DEFAULT_COMMIT_WINDOW = 5 minutes;
-    uint64 public constant DEFAULT_REVEAL_WINDOW = 5 minutes;
-    uint64 public constant DEFAULT_CLAIM_WINDOW = 30 minutes;
+    // uint64 public constant DEFAULT_COMMIT_WINDOW = 5 minutes;
+    // uint64 public constant DEFAULT_REVEAL_WINDOW = 5 minutes;
+    // uint64 public constant DEFAULT_CLAIM_WINDOW = 30 minutes;
+    // Short windows for hackathon only.
+    uint64 public constant DEFAULT_COMMIT_WINDOW = 30 seconds; 
+    uint64 public constant DEFAULT_REVEAL_WINDOW = 30 seconds;
+    uint64 public constant DEFAULT_CLAIM_WINDOW = 2 minutes;
 
     /// @notice Minimum reveals required to settle, censoring (verifier commits but doesn't reveal) must not
     /// deadlock the system — we proceed with as few as 2 reveals out of 3.

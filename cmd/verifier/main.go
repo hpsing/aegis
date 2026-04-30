@@ -209,6 +209,7 @@ func buildKeeperClient(
 	live, err := keeperhub.NewLiveClient(ctx, keeperhub.LiveClientConfig{
 		Endpoint:      mcpURL,
 		APIKey:        apiKey,
+		WorkflowIDs:   vcfg.WorkflowIDs(),
 		WorkflowSlugs: vcfg.WorkflowSlugs(),
 		VerifierKey:   key,
 		EthClient:     khEth,

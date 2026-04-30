@@ -26,8 +26,8 @@ set -uo pipefail   # NB: not -e — we tolerate cast's null-response error
 : "${V3_PK:?set V3_PK to verifier-3 private key}"
 
 RPC_URL="${RPC_URL:-https://evmrpc-testnet.0g.ai}"
-USDC_ADDR="${USDC_ADDR:-0xC74c0D2e91B715C89474c8480C812170054ef422}"
-REGISTRY_ADDR="${REGISTRY_ADDR:-0x5ec805A1991ECa4Fb876E86866bc32D9095F1270}"
+USDC_ADDR="${USDC_ADDR:-0xe9dA98EB0AF68cC48be7F71C29A7Bc5bA7fB45Eb}"
+REGISTRY_ADDR="${REGISTRY_ADDR:-0x50ce23AE35bbe43fFAd0B36FD3F567560b8EfB18}"
 STAKE="${STAKE:-100000000}"   # 100 mUSDC (6 decimals)
 
 # best_effort_send runs `cast send` and swallows the null-response error

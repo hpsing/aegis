@@ -12,7 +12,7 @@
 #
 # Optional env:
 #   KH_URL        defaults to https://app.keeperhub.com/mcp
-#   AEGIS_ADDR    defaults to 0xeF60Ad6aB86101F3f787C33957649b5c7a9Ca858
+#   AEGIS_ADDR    defaults to 0xa89833fBD1844763cc77C0a3aFaE32697A2F990f
 #   CHAIN_ID      defaults to 16602 (0G Galileo testnet)
 #   SKIP_V1_COMMIT  set to 1 to skip org-1 commit (already created earlier)
 #
@@ -31,7 +31,7 @@ set -euo pipefail
 : "${ORG3_API_KEY:?set ORG3_API_KEY}"
 
 KH_URL="${KH_URL:-https://app.keeperhub.com/mcp}"
-AEGIS_ADDR="${AEGIS_ADDR:-0xeF60Ad6aB86101F3f787C33957649b5c7a9Ca858}"
+AEGIS_ADDR="${AEGIS_ADDR:-0xa89833fBD1844763cc77C0a3aFaE32697A2F990f}"
 CHAIN_ID="${CHAIN_ID:-16602}"
 SKIP_V1_COMMIT="${SKIP_V1_COMMIT:-0}"
 

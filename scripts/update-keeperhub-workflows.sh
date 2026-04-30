@@ -9,7 +9,7 @@
 #
 # Optional env:
 #   KH_URL          default https://app.keeperhub.com/mcp
-#   AEGIS_ADDR      default 0xeF60Ad6aB86101F3f787C33957649b5c7a9Ca858
+#   AEGIS_ADDR      default 0xa89833fBD1844763cc77C0a3aFaE32697A2F990f
 #   CHAIN_ID        default 16602
 #   CONFIG_PATH     default configs/keeperhub.toml (where workflow ids live)
 
@@ -20,7 +20,7 @@ set -uo pipefail
 : "${ORG3_API_KEY:?set ORG3_API_KEY}"
 
 KH_URL="${KH_URL:-https://app.keeperhub.com/mcp}"
-AEGIS_ADDR="${AEGIS_ADDR:-0xeF60Ad6aB86101F3f787C33957649b5c7a9Ca858}"
+AEGIS_ADDR="${AEGIS_ADDR:-0xa89833fBD1844763cc77C0a3aFaE32697A2F990f}"
 CHAIN_ID="${CHAIN_ID:-16602}"
 CONFIG_PATH="${CONFIG_PATH:-configs/keeperhub.toml}"
 
