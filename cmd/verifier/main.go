@@ -1,12 +1,12 @@
-// verifier — the step-5 verifier role. Subscribes to QuorumContract
+// verifier — the step-5 verifier role. Subscribes to AegisContract
 // events, runs CheckClaim against a swap-chain RPC, commits + reveals
 // votes. The actual loop lives in internal/verifier — main() just wires
 // env vars to LoopConfig.
 //
 // Required env:
 //
-//	AEGIS_RPC                WS endpoint of the chain hosting AegisContract
-//	AEGIS_CONTRACT           AegisContract address
+//	AEGIS_RPC               WS endpoint of the chain hosting AegisContract.
+//	AEGIS_CONTRACT          AegisContract address
 //	REGISTRY_CONTRACT        VerifierRegistry address
 //	VERIFIER_PRIVATE_KEY     hex private key (no 0x prefix); EOA must be registered
 //	SWAP_RPC                 RPC for the chain where the swap happened
@@ -50,6 +50,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/hpsing/aegis/internal/chain"
 	"github.com/hpsing/aegis/internal/keeperhub"
 	"github.com/hpsing/aegis/internal/ogstorage"
@@ -159,13 +160,13 @@ func mustEnv(k string) string {
 // must defer.
 func buildKeeperClient(
 	ctx context.Context,
-	quorumRPC string,
+	aegisRPC string,
 	key *ecdsa.PrivateKey,
 ) (keeperhub.Client, func(), error) {
 	apiKey := os.Getenv("KEEPERHUB_API_KEY")
 	idxStr := os.Getenv("KEEPERHUB_VERIFIER_INDEX")
 	if apiKey == "" || idxStr == "" {
-		log.Printf("[verifier] KEEPERHUB_API_KEY or KEEPERHUB_VERIFIER_INDEX not set")
+		log.Printf("[verifier] keeperhub: no API key or verifier index found in env")
 	}
 
 	idx, err := strconv.Atoi(idxStr)
@@ -191,15 +192,36 @@ func buildKeeperClient(
 		mcpURL = cfg.MCPEndpoint
 	}
 
+	// LiveClient signs locally and broadcasts via its own ethclient (the
+	// call_workflow path — KH builds calldata, we sign + send). We hand
+	// it a fresh dial of the same RPC the verifier subscription uses, so
+	// nonce/gas come from the same view the rest of the loop sees.
+	khEth, err := ethclient.DialContext(ctx, aegisRPC)
+	if err != nil {
+		return nil, nil, fmt.Errorf("dial keeperhub rpc: %w", err)
+	}
+	chainID, err := khEth.ChainID(ctx)
+	if err != nil {
+		khEth.Close()
+		return nil, nil, fmt.Errorf("chain id: %w", err)
+	}
+
 	live, err := keeperhub.NewLiveClient(ctx, keeperhub.LiveClientConfig{
-		Endpoint:    mcpURL,
-		APIKey:      apiKey,
-		WorkflowIDs: vcfg.WorkflowIDs(),
+		Endpoint:      mcpURL,
+		APIKey:        apiKey,
+		WorkflowSlugs: vcfg.WorkflowSlugs(),
+		VerifierKey:   key,
+		EthClient:     khEth,
+		ChainID:       chainID,
 	})
 	if err != nil {
+		khEth.Close()
 		return nil, nil, fmt.Errorf("live client: %w", err)
 	}
-	log.Printf("[verifier] keeperhub: LIVE (org wallet=%s, idx=%d, endpoint=%s)",
+	log.Printf("[verifier] keeperhub: LIVE call_workflow (org wallet=%s, idx=%d, endpoint=%s)",
 		vcfg.Address, idx, live.Endpoint())
-	return live, live.Close, nil
+	return live, func() {
+		live.Close()
+		khEth.Close()
+	}, nil
 }

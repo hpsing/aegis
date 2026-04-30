@@ -251,6 +251,19 @@ func (c *MCPClient) GetExecutionStatus(
 	return c.ToolCall(ctx, "get_execution_status", map[string]any{"executionId": executionID})
 }
 
+// CallWorkflow invokes a LISTED workflow by its `listedSlug`. Per the KH
+// docs: "For write workflows, returns unsigned calldata {to, data, value}
+// for the caller to submit."
+func (c *MCPClient) CallWorkflow(
+	ctx context.Context, slug string, inputs map[string]any,
+) (json.RawMessage, error) {
+	args := map[string]any{"slug": slug}
+	if inputs != nil {
+		args["inputs"] = inputs
+	}
+	return c.ToolCall(ctx, "call_workflow", args)
+}
+
 // Close best-effort releases server-side state. Most MCP servers GC
 // sessions after inactivity; explicit close is a courtesy.
 func (c *MCPClient) Close() {

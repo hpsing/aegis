@@ -164,7 +164,9 @@ func (l *Loop) onClaimSubmitted(ctx context.Context, ev *aegis.AegisContractClai
 	st.nonce = nonce
 	l.mu.Unlock()
 
-	commitCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	// 120s accommodates LiveClient's 90s poll deadline + retry-with-backoff
+	// (3 attempts with 2/4/8s delays) when KH's dRPC free tier 408s.
+	commitCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 	receipt, err := l.cfg.OnChain.CommitVote(commitCtx, jobID, verdict, nonce)
 	if err != nil {

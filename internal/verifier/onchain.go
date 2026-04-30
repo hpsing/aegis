@@ -5,6 +5,8 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -13,6 +15,10 @@ import (
 	"github.com/hpsing/aegis/internal/aegis"
 	"github.com/hpsing/aegis/internal/keeperhub"
 )
+
+// pollInterval controls how often filter-fallback subscriptions scan the
+// chain head when the underlying RPC doesn't support eth_subscribe.
+const pollInterval = 5 * time.Second
 
 // OnChain is the high-level wrapper a verifier uses to interact with
 // AegisContract + VerifierRegistry. ALL writes (commit, reveal, settle)
@@ -221,26 +227,198 @@ func (o *OnChain) GetJob(ctx context.Context, jobID *big.Int) (Job, error) {
 	}, nil
 }
 
-// WatchJobPosted subscribes to JobPosted events. The returned Subscription
-// MUST be `.Unsubscribe()`d on shutdown to release the websocket.
+// WatchJobPosted subscribes to JobPosted events. Tries WebSocket first;
+// if the RPC doesn't support `eth_subscribe` (e.g., 0G Galileo's HTTP-only
+// public endpoint), falls back to polling FilterJobPosted on a 5s ticker.
 func (o *OnChain) WatchJobPosted(
 	ctx context.Context, sink chan<- *aegis.AegisContractJobPosted,
 ) (event.Subscription, error) {
-	return o.Aegis.WatchJobPosted(&bind.WatchOpts{Context: ctx}, sink, nil, nil, nil)
+	sub, err := o.Aegis.WatchJobPosted(&bind.WatchOpts{Context: ctx}, sink, nil, nil, nil)
+	if err == nil {
+		return sub, nil
+	}
+	if !isNoSubscribeErr(err) {
+		return nil, err
+	}
+	return o.pollJobPosted(ctx, sink)
 }
 
-// WatchClaimSubmitted — same shape.
+// WatchClaimSubmitted — same shape with polling fallback.
 func (o *OnChain) WatchClaimSubmitted(
 	ctx context.Context, sink chan<- *aegis.AegisContractClaimSubmitted,
 ) (event.Subscription, error) {
-	return o.Aegis.WatchClaimSubmitted(&bind.WatchOpts{Context: ctx}, sink, nil)
+	sub, err := o.Aegis.WatchClaimSubmitted(&bind.WatchOpts{Context: ctx}, sink, nil)
+	if err == nil {
+		return sub, nil
+	}
+	if !isNoSubscribeErr(err) {
+		return nil, err
+	}
+	return o.pollClaimSubmitted(ctx, sink)
 }
 
-// WatchJobSettled — same shape.
+// WatchJobSettled — same shape with polling fallback.
 func (o *OnChain) WatchJobSettled(
 	ctx context.Context, sink chan<- *aegis.AegisContractJobSettled,
 ) (event.Subscription, error) {
-	return o.Aegis.WatchJobSettled(&bind.WatchOpts{Context: ctx}, sink, nil)
+	sub, err := o.Aegis.WatchJobSettled(&bind.WatchOpts{Context: ctx}, sink, nil)
+	if err == nil {
+		return sub, nil
+	}
+	if !isNoSubscribeErr(err) {
+		return nil, err
+	}
+	return o.pollJobSettled(ctx, sink)
+}
+
+// isNoSubscribeErr identifies the go-ethereum error returned by HTTP-only
+// RPCs when callers attempt eth_subscribe. We fall back to polling rather
+// than failing the whole verifier loop.
+func isNoSubscribeErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "notifications not supported") ||
+		strings.Contains(s, "subscription not supported") ||
+		strings.Contains(s, "method eth_subscribe")
+}
+
+// pollSubscription is a poor man's event.Subscription that backs a
+// goroutine periodically calling Filter* over [lastBlock+1, head]. It
+// satisfies the event.Subscription interface for drop-in use anywhere
+// a Watch* subscription was expected.
+type pollSubscription struct {
+	cancel context.CancelFunc
+	errCh  chan error
+	done   chan struct{}
+}
+
+func (p *pollSubscription) Unsubscribe() {
+	p.cancel()
+	<-p.done
+}
+func (p *pollSubscription) Err() <-chan error { return p.errCh }
+
+// newPollSub builds a pollSubscription wrapping a tick loop. The body
+// closure is called once per tick with the (start, end) inclusive block
+// range and is expected to forward events to the user's sink.
+func (o *OnChain) newPollSub(
+	ctx context.Context,
+	tick func(pollCtx context.Context, start, end uint64) error,
+) (event.Subscription, error) {
+	head, err := o.client.BlockNumber(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("poll: get head: %w", err)
+	}
+	pollCtx, cancel := context.WithCancel(ctx)
+	sub := &pollSubscription{
+		cancel: cancel,
+		errCh:  make(chan error, 1),
+		done:   make(chan struct{}),
+	}
+	go func() {
+		defer close(sub.done)
+		lastBlock := head
+		ticker := time.NewTicker(pollInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-pollCtx.Done():
+				return
+			case <-ticker.C:
+			}
+			newHead, err := o.client.BlockNumber(pollCtx)
+			if err != nil {
+				if pollCtx.Err() != nil {
+					return
+				}
+				// transient — keep going on next tick
+				continue
+			}
+			if newHead <= lastBlock {
+				continue
+			}
+			if err := tick(pollCtx, lastBlock+1, newHead); err != nil {
+				if pollCtx.Err() != nil {
+					return
+				}
+				select {
+				case sub.errCh <- err:
+				default:
+				}
+				return
+			}
+			lastBlock = newHead
+		}
+	}()
+	return sub, nil
+}
+
+func (o *OnChain) pollJobPosted(
+	ctx context.Context, sink chan<- *aegis.AegisContractJobPosted,
+) (event.Subscription, error) {
+	return o.newPollSub(ctx, func(pollCtx context.Context, start, end uint64) error {
+		it, err := o.Aegis.FilterJobPosted(&bind.FilterOpts{
+			Start: start, End: &end, Context: pollCtx,
+		}, nil, nil, nil)
+		if err != nil {
+			return fmt.Errorf("filter JobPosted: %w", err)
+		}
+		defer it.Close()
+		for it.Next() {
+			select {
+			case sink <- it.Event:
+			case <-pollCtx.Done():
+				return pollCtx.Err()
+			}
+		}
+		return it.Error()
+	})
+}
+
+func (o *OnChain) pollClaimSubmitted(
+	ctx context.Context, sink chan<- *aegis.AegisContractClaimSubmitted,
+) (event.Subscription, error) {
+	return o.newPollSub(ctx, func(pollCtx context.Context, start, end uint64) error {
+		it, err := o.Aegis.FilterClaimSubmitted(&bind.FilterOpts{
+			Start: start, End: &end, Context: pollCtx,
+		}, nil)
+		if err != nil {
+			return fmt.Errorf("filter ClaimSubmitted: %w", err)
+		}
+		defer it.Close()
+		for it.Next() {
+			select {
+			case sink <- it.Event:
+			case <-pollCtx.Done():
+				return pollCtx.Err()
+			}
+		}
+		return it.Error()
+	})
+}
+
+func (o *OnChain) pollJobSettled(
+	ctx context.Context, sink chan<- *aegis.AegisContractJobSettled,
+) (event.Subscription, error) {
+	return o.newPollSub(ctx, func(pollCtx context.Context, start, end uint64) error {
+		it, err := o.Aegis.FilterJobSettled(&bind.FilterOpts{
+			Start: start, End: &end, Context: pollCtx,
+		}, nil)
+		if err != nil {
+			return fmt.Errorf("filter JobSettled: %w", err)
+		}
+		defer it.Close()
+		for it.Next() {
+			select {
+			case sink <- it.Event:
+			case <-pollCtx.Done():
+				return pollCtx.Err()
+			}
+		}
+		return it.Error()
+	})
 }
 
 // HeadTimestamp returns block.timestamp of the latest block (Unix seconds).

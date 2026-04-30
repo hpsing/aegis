@@ -20,15 +20,31 @@ type Config struct {
 	Verifier3 VerifierConfig `toml:"verifier_3"`
 }
 
-// VerifierConfig is the per-verifier slice of the KH config: which org's
-// wallet integration to sign with (implicit via API key) and which
-// workflow id to call per Purpose.
+// VerifierConfig is the per-verifier slice of the KH config.
+//
+// Each verifier has:
+//   - one KH API key (via env, not in this file) authenticating to its
+//     own org;
+//   - a wallet integration in that org (we don't actually need the
+//     integration id since we sign locally — kept for reference);
+//   - three published workflow ids (one per Purpose) for execute_workflow;
+//   - three listed slugs (one per Purpose) for call_workflow. The
+//     LiveClient uses slugs (call_workflow path).
 type VerifierConfig struct {
 	Address             string `toml:"address"`
 	WalletIntegrationID string `toml:"wallet_integration_id"`
-	CommitWorkflowID    string `toml:"commit_workflow_id"`
-	RevealWorkflowID    string `toml:"reveal_workflow_id"`
-	SettleWorkflowID    string `toml:"settle_workflow_id"`
+
+	// Workflow ids — used by execute_workflow path. Retained for tooling
+	// (update_workflow / unlist_workflow) that operates by id.
+	CommitWorkflowID string `toml:"commit_workflow_id"`
+	RevealWorkflowID string `toml:"reveal_workflow_id"`
+	SettleWorkflowID string `toml:"settle_workflow_id"`
+
+	// Listed slugs — what call_workflow consumes. Populated by
+	// scripts/list-keeperhub-workflows.sh after `update_workflow_listing`.
+	CommitWorkflowSlug string `toml:"commit_workflow_slug"`
+	RevealWorkflowSlug string `toml:"reveal_workflow_slug"`
+	SettleWorkflowSlug string `toml:"settle_workflow_slug"`
 }
 
 // LoadConfig reads + parses configs/keeperhub.toml.
@@ -65,12 +81,21 @@ func (c *Config) VerifierByIndex(idx int) (VerifierConfig, error) {
 	}
 }
 
-// WorkflowIDs returns the Purpose→id map for a single verifier — what
-// LiveClientConfig.WorkflowIDs wants.
+// WorkflowIDs returns the Purpose→id map (legacy execute_workflow path).
 func (v VerifierConfig) WorkflowIDs() map[Purpose]string {
 	return map[Purpose]string{
 		PurposeCommit: v.CommitWorkflowID,
 		PurposeReveal: v.RevealWorkflowID,
 		PurposeSettle: v.SettleWorkflowID,
+	}
+}
+
+// WorkflowSlugs returns the Purpose→listedSlug map — what
+// LiveClientConfig.WorkflowSlugs wants for the call_workflow path.
+func (v VerifierConfig) WorkflowSlugs() map[Purpose]string {
+	return map[Purpose]string{
+		PurposeCommit: v.CommitWorkflowSlug,
+		PurposeReveal: v.RevealWorkflowSlug,
+		PurposeSettle: v.SettleWorkflowSlug,
 	}
 }
