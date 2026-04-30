@@ -22,7 +22,7 @@ import (
 // LoopConfig is the per-process verifier configuration. All inputs come
 // from cmd/verifier's env-var parsing — Loop never reads env directly.
 type LoopConfig struct {
-	OnChain    *OnChain          // QuorumContract + Registry bindings
+	OnChain    *OnChain          // AegisContract + Registry bindings
 	SwapRPC    chain.EthClient   // chain where the swap happened
 	Storage    ogstorage.Storage // 0G Storage; nil disables post-settlement hooks
 	INftID     uint64            // verifier's iNFT token id; 0 if not minted yet
@@ -33,7 +33,7 @@ type LoopConfig struct {
 
 // Loop is the chain-event-driven verifier. State is held in-memory; on
 // crash we lose it (acceptable per step-05 scope). Events come from
-// QuorumContract subscriptions, votes go back via OnChain.
+// AegisContract subscriptions, votes go back via OnChain.
 type Loop struct {
 	cfg   LoopConfig
 	mu    sync.Mutex
@@ -44,12 +44,14 @@ type Loop struct {
 // Stats are exposed for tests that want to assert behavior at the end of
 // a scenario.
 type Stats struct {
-	JobsHandled         uint64
-	CommitsLanded       uint64
-	RevealsLanded       uint64
-	SettlesAttempt      uint64
-	StorageAppendOK     uint64
-	StorageAppendErrors uint64
+	JobsHandled          uint64
+	CommitsLanded        uint64
+	RevealsLanded        uint64
+	SettlesAttempt       uint64
+	StorageAppendOK      uint64
+	StorageAppendErrors  uint64
+	ProofBundlesUploaded uint64
+	ProofBundleErrors    uint64
 }
 
 type jobState struct {
@@ -162,15 +164,15 @@ func (l *Loop) onClaimSubmitted(ctx context.Context, ev *aegis.AegisContractClai
 	st.nonce = nonce
 	l.mu.Unlock()
 
-	commitCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	commitCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	tx, err := l.cfg.OnChain.CommitVote(commitCtx, jobID, verdict, nonce)
+	receipt, err := l.cfg.OnChain.CommitVote(commitCtx, jobID, verdict, nonce)
 	if err != nil {
 		l.logf("commit %s: %v", key, err)
 		return
 	}
 	l.bump(&l.stats.CommitsLanded)
-	l.logf("commit %s verdict=%v tx=%s", key, verdict, tx.Hash().Hex())
+	l.logf("commit %s verdict=%v tx=%s attempts=%d", key, verdict, receipt.TxHash.Hex(), receipt.Attempts)
 
 	if l.cfg.SkipReveal {
 		l.logf("CENSOR MODE: skipping reveal for job %s", key)
@@ -211,9 +213,9 @@ func (l *Loop) scheduleReveal(ctx context.Context, jobID *big.Int, job Job) {
 		return
 	}
 
-	rctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	rctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	tx, err := l.cfg.OnChain.RevealVote(rctx, jobID, st.verdict, st.nonce)
+	receipt, err := l.cfg.OnChain.RevealVote(rctx, jobID, st.verdict, st.nonce)
 	if err != nil {
 		l.logf("reveal %s: %v", jobID, err)
 		return
@@ -222,7 +224,7 @@ func (l *Loop) scheduleReveal(ctx context.Context, jobID *big.Int, job Job) {
 	st.revealed = true
 	l.mu.Unlock()
 	l.bump(&l.stats.RevealsLanded)
-	l.logf("reveal %s verdict=%v tx=%s", jobID, st.verdict, tx.Hash().Hex())
+	l.logf("reveal %s verdict=%v tx=%s attempts=%d", jobID, st.verdict, receipt.TxHash.Hex(), receipt.Attempts)
 }
 
 // headTimestamp returns the latest block's timestamp (Unix seconds).
@@ -242,14 +244,44 @@ func (l *Loop) onJobSettled(ctx context.Context, ev *aegis.AegisContractJobSettl
 	l.mu.Unlock()
 	l.bump(&l.stats.JobsHandled)
 
-	// Post-settlement hook: append a VoteRecord to our 0G Storage Log.
-	// Only fires for jobs we actually voted on (commits AND reveals).
-	// Failures are logged + counted but never propagated — the on-chain
-	// state is the source of truth; 0G Storage is an audit convenience.
+	// Post-settlement hooks: (1) append a VoteRecord to our per-iNFT log,
+	// (2) build + upload a ProofBundle for the whole job. Both fire only
+	// for jobs we actually voted on. Failures are logged + counted but
+	// never propagated — the on-chain Registry is the source of truth.
 	if l.cfg.Storage == nil || st == nil || !st.revealed {
 		return
 	}
 	go l.appendVoteRecord(ctx, ev, st)
+	go l.uploadProofBundle(ctx, ev)
+}
+
+// uploadProofBundle assembles the per-job ProofBundle from on-chain state
+// + the keeper audit trail and uploads to 0G Storage. Best-effort.
+func (l *Loop) uploadProofBundle(ctx context.Context, ev *aegis.AegisContractJobSettled) {
+	jobID := new(big.Int).Set(ev.JobId)
+	job, err := l.cfg.OnChain.GetJob(ctx, jobID)
+	if err != nil {
+		l.logf("proof bundle %s: getJob: %v", jobID, err)
+		return
+	}
+	uri, err := BuildProofBundle(
+		ctx,
+		l.cfg.Storage,
+		l.cfg.OnChain.keeper,
+		job,
+		jobID,
+		ev.FinalVerdict,
+		"0x"+strings.ToLower(hex.EncodeToString(ev.Raw.TxHash[:])),
+		ev.Raw.BlockNumber,
+		l.cfg.OnChain.Address().Hex(),
+	)
+	if err != nil {
+		l.logf("proof bundle %s: %v", jobID, err)
+		l.bump(&l.stats.ProofBundleErrors)
+		return
+	}
+	l.bump(&l.stats.ProofBundlesUploaded)
+	l.logf("proof bundle %s -> %s", jobID, uri)
 }
 
 // appendVoteRecord runs post-settlement on a goroutine. Retries are
@@ -288,6 +320,7 @@ func verdictString(v bool) string {
 // runCheck reconstructs the ExecutionClaim from on-chain state + the
 // reported result hashes, then runs CheckClaim. The "swap chain"
 // EthClient is configured by the caller — production points at Base,
+// local devnet uses a mock.
 func (l *Loop) runCheck(
 	ctx context.Context, _ *big.Int, job Job, ev *aegis.AegisContractClaimSubmitted,
 ) (bool, error) {
@@ -367,16 +400,16 @@ func (l *Loop) SettleAfter(ctx context.Context, jobID *big.Int, wait time.Durati
 		return
 	case <-time.After(wait):
 	}
-	tctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	tctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	tx, err := l.cfg.OnChain.Settle(tctx, jobID)
+	receipt, err := l.cfg.OnChain.Settle(tctx, jobID)
 	l.bump(&l.stats.SettlesAttempt)
 	if err != nil {
 		// Expected when another settler beat us to it.
 		l.logf("settle %s: %v (likely already settled)", jobID, err)
 		return
 	}
-	l.logf("settle %s tx=%s", jobID, tx.Hash().Hex())
+	l.logf("settle %s tx=%s", jobID, receipt.TxHash.Hex())
 }
 
 // AddrPrefix is a 6-char display abbreviation for an Ethereum address.

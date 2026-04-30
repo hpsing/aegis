@@ -8,31 +8,41 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/event"
-
 	"github.com/hpsing/aegis/internal/aegis"
+	"github.com/hpsing/aegis/internal/keeperhub"
 )
 
 // OnChain is the high-level wrapper a verifier uses to interact with
-// AegisContract + VerifierRegistry. It bundles the abigen bindings
-// with a TransactOpts pre-configured from the verifier's private key.
+// AegisContract + VerifierRegistry. ALL writes (commit, reveal, settle)
+// go through `keeper` — the KeeperHub.Client — instead of broadcasting
+// directly. This satisfies the architecture-doc §4 invariant ("every
+// settlement-critical tx routes through KeeperHub for retry, gas
+// optimization, audit trail").
 type OnChain struct {
 	Aegis     *aegis.AegisContract
 	Registry  *aegis.VerifierRegistry
 	signerKey *ecdsa.PrivateKey
 	chainID   *big.Int
 	client    *ethclient.Client
+	keeper    keeperhub.Client
+	aegisAddr common.Address
 }
 
-// NewOnChain wires bindings to the given RPC + key.
+// NewOnChain wires bindings to the given RPC + key. `keeper` is the
+// KeeperHub.Client every write routes through; tests pass a MockClient,
+// production passes a LiveClient.
 func NewOnChain(
 	ctx context.Context,
 	rpcURL string,
 	aegisAddr, registryAddr common.Address,
 	signerKey *ecdsa.PrivateKey,
+	keeper keeperhub.Client,
 ) (*OnChain, error) {
+	if keeper == nil {
+		return nil, fmt.Errorf("keeperhub.Client required")
+	}
 	client, err := ethclient.DialContext(ctx, rpcURL)
 	if err != nil {
 		return nil, fmt.Errorf("dial %s: %w", rpcURL, err)
@@ -49,7 +59,15 @@ func NewOnChain(
 	if err != nil {
 		return nil, fmt.Errorf("bind VerifierRegistry: %w", err)
 	}
-	return &OnChain{Aegis: q, Registry: r, signerKey: signerKey, chainID: chainID, client: client}, nil
+	return &OnChain{
+		Aegis:     q,
+		Registry:  r,
+		signerKey: signerKey,
+		chainID:   chainID,
+		client:    client,
+		keeper:    keeper,
+		aegisAddr: aegisAddr,
+	}, nil
 }
 
 // Address returns the EOA the OnChain client signs as.
@@ -74,36 +92,93 @@ func (o *OnChain) transactor(ctx context.Context) (*bind.TransactOpts, error) {
 	return opts, nil
 }
 
-// CommitVote computes the commit hash and submits commitVote().
+// noSendTransactor builds calldata via abigen without broadcasting. We
+// then forward the (to, data, gas) tuple to KeeperHub.Client which
+// signs+sends with retry/gas-bump/audit-trail.
+func (o *OnChain) noSendTransactor(ctx context.Context) (*bind.TransactOpts, error) {
+	opts, err := o.transactor(ctx)
+	if err != nil {
+		return nil, err
+	}
+	opts.NoSend = true
+	return opts, nil
+}
+
+// CommitVote computes the commit hash and routes the commitVote()
+// calldata through KeeperHub.
 func (o *OnChain) CommitVote(
 	ctx context.Context, jobID *big.Int, verdict bool, nonce [32]byte,
-) (*types.Transaction, error) {
-	opts, err := o.transactor(ctx)
+) (keeperhub.Receipt, error) {
+	opts, err := o.noSendTransactor(ctx)
 	if err != nil {
-		return nil, err
+		return keeperhub.Receipt{}, err
 	}
 	hash := commitHash(verdict, nonce, o.signerAddress())
-	return o.Aegis.CommitVote(opts, jobID, hash)
+	tx, err := o.Aegis.CommitVote(opts, jobID, hash)
+	if err != nil {
+		return keeperhub.Receipt{}, fmt.Errorf("build commit calldata: %w", err)
+	}
+	return o.send(ctx, tx, jobID, keeperhub.PurposeCommit)
 }
 
-// RevealVote submits revealVote() with the previously committed (verdict, nonce).
+// RevealVote routes revealVote() through KeeperHub.
 func (o *OnChain) RevealVote(
 	ctx context.Context, jobID *big.Int, verdict bool, nonce [32]byte,
-) (*types.Transaction, error) {
-	opts, err := o.transactor(ctx)
+) (keeperhub.Receipt, error) {
+	opts, err := o.noSendTransactor(ctx)
 	if err != nil {
-		return nil, err
+		return keeperhub.Receipt{}, err
 	}
-	return o.Aegis.RevealVote(opts, jobID, verdict, nonce)
+	tx, err := o.Aegis.RevealVote(opts, jobID, verdict, nonce)
+	if err != nil {
+		return keeperhub.Receipt{}, fmt.Errorf("build reveal calldata: %w", err)
+	}
+	return o.send(ctx, tx, jobID, keeperhub.PurposeReveal)
 }
 
-// Settle calls settle() — anyone can call once the reveal deadline passes.
-func (o *OnChain) Settle(ctx context.Context, jobID *big.Int) (*types.Transaction, error) {
-	opts, err := o.transactor(ctx)
+// Settle routes settle() through KeeperHub.
+func (o *OnChain) Settle(ctx context.Context, jobID *big.Int) (keeperhub.Receipt, error) {
+	opts, err := o.noSendTransactor(ctx)
 	if err != nil {
-		return nil, err
+		return keeperhub.Receipt{}, err
 	}
-	return o.Aegis.Settle(opts, jobID)
+	tx, err := o.Aegis.Settle(opts, jobID)
+	if err != nil {
+		return keeperhub.Receipt{}, fmt.Errorf("build settle calldata: %w", err)
+	}
+	return o.send(ctx, tx, jobID, keeperhub.PurposeSettle)
+}
+
+// send is the shared "abigen tx → KeeperHub" handoff. NoSend transactors
+// always populate `*types.Transaction.To/Data/Gas` even though they don't
+// broadcast, so we extract those fields and pass them on.
+func (o *OnChain) send(
+	ctx context.Context,
+	tx interface {
+		To() *common.Address
+		Data() []byte
+		Value() *big.Int
+		Gas() uint64
+	},
+	jobID *big.Int,
+	purpose keeperhub.Purpose,
+) (keeperhub.Receipt, error) {
+	to := tx.To()
+	if to == nil {
+		return keeperhub.Receipt{}, fmt.Errorf("nil recipient on built tx")
+	}
+	return o.keeper.SendTransaction(ctx, keeperhub.SendTxInput{
+		ChainID:  o.chainID.Uint64(),
+		To:       *to,
+		Data:     tx.Data(),
+		Value:    tx.Value(),
+		GasLimit: tx.Gas(),
+		Metadata: keeperhub.Metadata{
+			JobID:          jobID.Uint64(),
+			Purpose:        purpose,
+			IdempotencyKey: keeperhub.DefaultIdempotencyKey(jobID.Uint64(), purpose),
+		},
+	})
 }
 
 // Job is the read-side representation of AegisContract.jobs(jobId). Mirrors

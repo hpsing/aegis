@@ -52,10 +52,12 @@ new_session() {
     | grep -i '^mcp-session-id:' | awk '{print $2}' | tr -d '\r\n'
 }
 
-# create_workflow API_KEY SID NAME DESC TRIGGER_DESC ACTION_LABEL ACTION_DESC ABI_JSON FUNC_NAME FUNC_ARGS
+# create_workflow API_KEY SID NAME DESC TRIGGER_DESC ACTION_LABEL ACTION_DESC ABI_JSON FUNC_NAME INPUT_FIELDS_JSON FUNC_ARGS_JSON
 create_workflow() {
-  local key="$1" sid="$2" name="$3" desc="$4" trigDesc="$5" actLabel="$6" actDesc="$7" abi="$8" fn="$9" args="${10}"
+  local key="$1" sid="$2" name="$3" desc="$4" trigDesc="$5" actLabel="$6" actDesc="$7" abi="$8" fn="$9" inputFields="${10}" funcArgs="${11}"
   # Build the JSON-RPC body via jq to avoid manual escape headaches.
+  # inputFields and funcArgs come in as JSON strings (e.g. '[{"name":"jobId",...}]')
+  # and are spliced via --argjson so they remain typed (NOT stringified).
   local body
   body=$(jq -nc \
     --arg name "$name" \
@@ -67,7 +69,8 @@ create_workflow() {
     --arg addr "$AEGIS_ADDR" \
     --arg abi "$abi" \
     --arg fn "$fn" \
-    --arg args "$args" \
+    --argjson inputFields "$inputFields" \
+    --argjson funcArgs "$funcArgs" \
     '{
       jsonrpc:"2.0", id:10, method:"tools/call",
       params:{
@@ -77,10 +80,12 @@ create_workflow() {
           description:$desc,
           nodes:[
             {id:"manual-trigger",type:"trigger",position:{x:100,y:200},
-             data:{label:"Manual Trigger",description:$trigDesc,type:"trigger",config:{triggerType:"Manual"},status:"idle"}},
+             data:{label:"Manual Trigger",description:$trigDesc,type:"trigger",
+                   config:{triggerType:"Manual", inputFields:$inputFields},
+                   status:"idle"}},
             {id:"action",type:"action",position:{x:350,y:200},
              data:{label:$actLabel,description:$actDesc,type:"action",
-                   config:{actionType:"web3/write-contract",network:$net,contractAddress:$addr,abi:$abi,abiFunction:$fn,functionArgs:$args},
+                   config:{actionType:"web3/write-contract",network:$net,contractAddress:$addr,abi:$abi,abiFunction:$fn,functionArgs:$funcArgs},
                    status:"idle"}}
           ],
           edges:[{id:"e1",type:"default",source:"manual-trigger",target:"action"}]
@@ -123,7 +128,9 @@ fire_org_workflows() {
       "Quorum: verifier commits a vote hash to AegisContract on 0G Galileo. Inputs: jobId (uint256), commitHash (bytes32)." \
       "Inputs: jobId (uint256), commitHash (bytes32)" \
       "Commit Vote" "Calls commitVote on AegisContract" \
-      "$ABI_COMMIT" "commitVote" "[\$jobId\$, \$commitHash\$]")
+      "$ABI_COMMIT" "commitVote" \
+      '[{"name":"jobId","type":"string"},{"name":"commitHash","type":"string"}]' \
+      '"[\"{{@manual-trigger:Manual Trigger.jobId}}\",\"{{@manual-trigger:Manual Trigger.commitHash}}\"]"')
     echo "$commit_id"
   fi
 
@@ -133,7 +140,9 @@ fire_org_workflows() {
     "Quorum: verifier reveals their vote on AegisContract. Inputs: jobId (uint256), verdict (bool), nonce (bytes32)." \
     "Inputs: jobId (uint256), verdict (bool), nonce (bytes32)" \
     "Reveal Vote" "Calls revealVote on AegisContract" \
-    "$ABI_REVEAL" "revealVote" "[\$jobId\$, \$verdict\$, \$nonce\$]")
+    "$ABI_REVEAL" "revealVote" \
+    '[{"name":"jobId","type":"string"},{"name":"verdict","type":"string"},{"name":"nonce","type":"string"}]' \
+    '"[\"{{@manual-trigger:Manual Trigger.jobId}}\",\"{{@manual-trigger:Manual Trigger.verdict}}\",\"{{@manual-trigger:Manual Trigger.nonce}}\"]"')
   echo "$reveal_id"
 
   echo -n "  v${idx}/settle  ... "
@@ -142,7 +151,9 @@ fire_org_workflows() {
     "Quorum: anyone can call settle on AegisContract once reveal deadline passes. Input: jobId (uint256)." \
     "Input: jobId (uint256)" \
     "Settle" "Calls settle on AegisContract" \
-    "$ABI_SETTLE" "settle" "[\$jobId\$]")
+    "$ABI_SETTLE" "settle" \
+    '[{"name":"jobId","type":"string"}]' \
+    '"[\"{{@manual-trigger:Manual Trigger.jobId}}\"]"')
   echo "$settle_id"
 
   case "$idx" in

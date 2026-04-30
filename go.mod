@@ -6,6 +6,7 @@ require (
 	github.com/0gfoundation/0g-storage-client v1.3.0
 	github.com/ethereum/go-ethereum v1.17.2
 	github.com/openweb3/web3go v0.3.4
+	github.com/pelletier/go-toml/v2 v2.2.2
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
 )
