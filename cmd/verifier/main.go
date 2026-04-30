@@ -5,8 +5,8 @@
 //
 // Required env:
 //
-//	QUORUM_RPC               WS endpoint of the chain hosting QuorumContract
-//	QUORUM_CONTRACT          QuorumContract address
+//	AEGIS_RPC                WS endpoint of the chain hosting AegisContract
+//	AEGIS_CONTRACT           AegisContract address
 //	REGISTRY_CONTRACT        VerifierRegistry address
 //	VERIFIER_PRIVATE_KEY     hex private key (no 0x prefix); EOA must be registered
 //	SWAP_RPC                 RPC for the chain where the swap happened
@@ -61,8 +61,8 @@ func main() {
 	label := flag.String("label", "", "log prefix (defaults to addr suffix)")
 	flag.Parse()
 
-	quorumRPC := mustEnv("QUORUM_RPC")
-	quorumAddr := common.HexToAddress(mustEnv("QUORUM_CONTRACT"))
+	aegisRPC := mustEnv("AEGIS_RPC")
+	aegisAddr := common.HexToAddress(mustEnv("AEGIS_CONTRACT"))
 	registryAddr := common.HexToAddress(mustEnv("REGISTRY_CONTRACT"))
 	keyHex := strings.TrimPrefix(mustEnv("VERIFIER_PRIVATE_KEY"), "0x")
 	swapRPC := mustEnv("SWAP_RPC")
@@ -85,13 +85,13 @@ func main() {
 	// use LiveClient (KH signs and broadcasts via its server-side wallet
 	// integration). Otherwise fall back to MockClient (local key signs,
 	// in-process audit trail).
-	keeper, keeperCloser, err := buildKeeperClient(ctx, quorumRPC, key)
+	keeper, keeperCloser, err := buildKeeperClient(ctx, aegisRPC, key)
 	if err != nil {
 		log.Fatalf("[verifier] keeperhub: %v", err)
 	}
 	defer keeperCloser()
 
-	onchain, err := verifier.NewOnChain(ctx, quorumRPC, quorumAddr, registryAddr, key, keeper)
+	onchain, err := verifier.NewOnChain(ctx, aegisRPC, aegisAddr, registryAddr, key, keeper)
 	if err != nil {
 		log.Fatalf("[verifier] onchain: %v", err)
 	}
