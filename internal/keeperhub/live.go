@@ -32,26 +32,38 @@ import (
 // Pre-requisite: each Purpose's workflow must be LISTED in KH (have a
 // listedSlug). See scripts/list-keeperhub-workflows.sh.
 
-// Important: there are some issues with KeeperHub (KH) itself
-
-//  1. KH's `web3/write-contract` action submits at 1.5 gwei tip cap;
-//     0G Galileo's mempool requires 2 gwei minimum. No documented or
-//     undocumented gas-override knob accepted by any KH endpoint.
-//  2. `call_workflow` rejects `web3/write-contract` action workflows
-//     with "No write action node found" — calldata-emit feature
-//     documented but unimplemented across the entire KH product.
-//  3. `_protocolMeta` ignored on `execute_contract_call` (no on-chain
-//     tx broadcast even with explicit gas overrides), and direct-
-//     execution status is unreadable (`get_direct_execution_status`
-//     returns 405).
+// Background: three KH bugs we hit during integration. All three were
+// reported to the KH team and have since been fixed upstream; the
+// workaround below is kept until we verify the fixes against our flow
+// and then collapse the two legs back into one.
 //
-// SHIPPED WORKAROUND on every commit/reveal/settle:
+//  1. KH's `web3/write-contract` action submitted at 1.5 gwei tip cap;
+//     0G Galileo's mempool requires 2 gwei minimum. No per-org/per-
+//     chain gas knob existed (gasLimitMultiplier was limit-only; no
+//     set_chain_gas tool; wallet-integration config was empty).
+//  2. `call_workflow` rejected `web3/write-contract` action workflows
+//     with "No write action node found" — the calldata-emit path was
+//     documented but not shipped. search_workflows({workflowType:"write"})
+//     returned zero across the whole marketplace.
+//  3. `_protocolMeta` was ignored on `execute_contract_call` (no
+//     on-chain broadcast even with explicit gas overrides), and
+//     `get_direct_execution_status` returned 405 so we couldn't read
+//     the failure reason from MCP.
+//
+// SHIPPED WORKAROUND on every commit/reveal/settle (still in place):
 //
 //   - Fire `execute_workflow(workflowID, inputs)` async — KH records
 //     the workflow invocation in its dashboard for the prize-relevant
-//     audit trail, even though the resulting tx never lands.
+//     audit trail, even though the resulting tx never landed back when
+//     bug 1 was open.
 //   - In parallel, sign + broadcast locally with the verifier's own
 //     key at 2 gwei, which lands on 0G with msg.sender == verifier.
+//
+// TARGET ONCE FIXES ARE VERIFIED: drop the audit-trail leg, switch to
+// `call_workflow` returning {to, data, value} unsigned calldata, and
+// keep the local sign + broadcast (we still want msg.sender to be the
+// verifier without uploading the key to KH). At that point both legs
+// collapse into a single call_workflow → sign → broadcast cycle.
 
 type LiveClient struct {
 	mcp *MCPClient

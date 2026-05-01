@@ -58,6 +58,22 @@ echo "  rpc:       $RPC_URL"
 echo "  logs:      $LOGDIR/"
 echo
 
+echo "=== killing stale aegis processes ==="
+# Zombie verifiers from a prior run (Ctrl-C / terminal close skipped the
+# cleanup trap) keep polling /recv on the AXL daemons we're about to
+# restart and steal spec_publish messages from the new verifiers,
+# causing them to abstain. The on-chain commits/reveals from zombies
+# also confuse the e2e because they're done with stale code paths.
+for pat in "exe/verifier --label" "exe/publisher" "exe/executor"; do
+  pids=$(pgrep -f "$pat" 2>/dev/null || true)
+  if [[ -n "$pids" ]]; then
+    echo "  killing: $pat → $pids"
+    kill $pids 2>/dev/null || true
+  fi
+done
+sleep 2
+echo
+
 echo "=== AXL swarm ==="
 bash scripts/run-axl-swarm.sh
 AXL_PUB_URL="http://127.0.0.1:9002"
@@ -223,6 +239,23 @@ read_reveals() {
   cast call "$AEGIS_ADDR" "revealCount(uint256)(uint256)" "$JOB_ID" --rpc-url "$RPC_URL" 2>/dev/null | head -1 | awk '{print $1}'
 }
 
+# read_reveal_deadline returns the job's revealDeadline (uint64 unix
+# seconds). Reads the full Job struct and pulls the 11th field.
+read_reveal_deadline() {
+  cast call "$AEGIS_ADDR" \
+    "jobs(uint256)(address,address,uint256,uint256,uint256,bytes32,bytes32,bytes32,uint64,uint64,uint64,uint8)" \
+    "$JOB_ID" --rpc-url "$RPC_URL" 2>/dev/null \
+    | sed -n '11p' | awk '{print $1}'
+}
+
+# read_chain_now returns the latest block's timestamp (Unix s). Settle
+# checks block.timestamp, NOT wall-clock — chain may lag wall. cast
+# block (text mode) prints "timestamp  <decimal> (...)"; we take col 2.
+read_chain_now() {
+  cast block latest --rpc-url "$RPC_URL" 2>/dev/null \
+    | awk '$1=="timestamp"{print $2; exit}'
+}
+
 show_progress() {
   local s; s=$(read_status)
   local label; label=$(status_label "$s")
@@ -244,13 +277,31 @@ while (( elapsed < 600 )); do
   show_progress
   nrev=$(read_reveals)
   if [[ "${nrev:-0}" == "3" ]]; then
-    echo "  all 3 reveals landed — proceeding to settle"
+    echo "  all 3 reveals landed — waiting for revealDeadline before settle"
     break
   fi
 done
 
 
 # ---------- 6. settle ----------
+# settle() requires block.timestamp > revealDeadline. Even with all 3
+# reveals in, calling settle before the deadline reverts with
+# DeadlineNotPassed. Wait until chain time is past revealDeadline
+# (+5s buffer for clock skew) before dispatching.
+RD=$(read_reveal_deadline)
+if [[ -n "$RD" ]]; then
+  while :; do
+    NOW=$(read_chain_now)
+    if [[ -n "$NOW" ]] && (( NOW > RD )); then
+      break
+    fi
+    if [[ -n "$NOW" ]]; then
+      printf -- "  chain time %s, revealDeadline %s, waiting %ds...\n" "$NOW" "$RD" $(( RD - NOW + 5 ))
+    fi
+    sleep 5
+  done
+fi
+
 echo
 echo "=== calling settle ==="
 # 0G Galileo's RPC frequently returns partial/null responses for cast
