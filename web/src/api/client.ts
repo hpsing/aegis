@@ -7,14 +7,10 @@ import type {
   TopologyState,
   VerifierInfo,
 } from './types'
-
-// API base. Vite dev proxies /api → :3000 (Go backend). Prod serves
-// from the same origin via the embedded SPA, so a relative base works
-// in both modes.
-const BASE = ''
+import { apiUrl } from './base'
 
 async function getJSON<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: { Accept: 'application/json' } })
+  const res = await fetch(apiUrl(path), { headers: { Accept: 'application/json' } })
   if (!res.ok) {
     throw new Error(`${path}: ${res.status} ${res.statusText}`)
   }
@@ -31,7 +27,7 @@ export const api = {
   proofbundle: (root: string) => getJSON<unknown>(`/api/proofbundle/${encodeURIComponent(root)}`),
   postJobPreview: () => getJSON<PostJobPreview>('/api/post-job/preview'),
   postJob: () =>
-    fetch(`${BASE}/api/post-job`, { method: 'POST' }).then(async (r) => {
+    fetch(apiUrl('/api/post-job'), { method: 'POST' }).then(async (r) => {
       if (!r.ok) {
         const body = await r.text().catch(() => '')
         throw new Error(body || `postJob: ${r.status}`)

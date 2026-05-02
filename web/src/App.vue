@@ -3,8 +3,10 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useSwarmStore } from '@/stores/swarm'
 import { api } from '@/api/client'
+import { apiBase } from '@/api/base'
 import PostJobModal from '@/components/PostJobModal.vue'
 import AboutPanel from '@/components/AboutPanel.vue'
+import ApiBaseModal from '@/components/ApiBaseModal.vue'
 
 const store = useSwarmStore()
 const router = useRouter()
@@ -44,6 +46,18 @@ interface Toast {
 const toast = ref<Toast | null>(null)
 const showModal = ref(false)
 const showAbout = ref(false)
+const showApiBase = ref(false)
+
+// Short label for the API endpoint pill in the header. Shows the host
+// when remote (e.g. cloudflared tunnel) or "local" when same-origin.
+const apiBaseLabel = computed(() => {
+  if (!apiBase.value) return 'local'
+  try {
+    return new URL(apiBase.value).host
+  } catch {
+    return apiBase.value
+  }
+})
 
 function openModal() {
   showModal.value = true
@@ -85,6 +99,13 @@ async function onConfirm() {
         </nav>
       </div>
       <div class="flex items-center gap-4 text-xs">
+        <button
+          @click="showApiBase = true"
+          class="pill bg-bg-subtle border border-bg-border hover:border-accent-chain text-ink-2"
+          :title="`API endpoint: ${apiBase || '(same origin)'} — click to change`"
+        >
+          API: {{ apiBaseLabel }}
+        </button>
         <div class="flex items-center gap-1.5">
           <span class="inline-block w-2 h-2 rounded-full" :class="store.connected ? 'bg-accent-pass' : 'bg-accent-fail'"></span>
           <span class="text-ink-2">{{ store.connected ? 'live' : 'offline' }}</span>
@@ -118,6 +139,7 @@ async function onConfirm() {
 
     <PostJobModal v-if="showModal" @close="showModal = false" @confirm="onConfirm" />
     <AboutPanel v-if="showAbout" @close="showAbout = false" />
+    <ApiBaseModal v-if="showApiBase" @close="showApiBase = false" />
 
     <transition
       enter-active-class="transition duration-200 ease-out"

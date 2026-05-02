@@ -1,7 +1,11 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory } from 'vue-router'
 
+// Hash history: routes live at `/#/jobs/14` instead of `/jobs/14`.
+// This is required for GitHub Pages (no SPA fallback for unknown
+// paths → hard refresh of `/jobs/14` 404s) and is harmless for the
+// embedded build served from the Go binary. Keep it for both.
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/', name: 'live', component: () => import('@/views/LiveDemo.vue') },
     { path: '/jobs/:id', name: 'job', component: () => import('@/views/JobInspector.vue'), props: true },

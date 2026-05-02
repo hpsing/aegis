@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { api } from '@/api/client'
+import { apiUrl } from '@/api/base'
 import type {
   JobSummary,
   ServerEvent,
@@ -93,7 +94,7 @@ export const useSwarmStore = defineStore('swarm', () => {
   let sse: EventSource | null = null
   function connectSSE() {
     if (sse) return
-    sse = new EventSource('/api/events')
+    sse = new EventSource(apiUrl('/api/events'))
     sse.onopen = () => {
       connected.value = true
       lastError.value = null
@@ -115,6 +116,11 @@ export const useSwarmStore = defineStore('swarm', () => {
     sse = null
     connected.value = false
   }
+  // Caller invokes after setApiBase() to repoint the live stream.
+  function reconnectSSE() {
+    disconnectSSE()
+    connectSSE()
+  }
 
   return {
     totals,
@@ -128,5 +134,6 @@ export const useSwarmStore = defineStore('swarm', () => {
     loadSnapshot,
     connectSSE,
     disconnectSSE,
+    reconnectSSE,
   }
 })

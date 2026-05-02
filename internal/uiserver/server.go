@@ -35,6 +35,7 @@ type DataSource interface {
 func New(cfg Config) http.Handler {
 	mux := http.NewServeMux()
 
+
 	mux.HandleFunc("/api/state", func(w http.ResponseWriter, r *http.Request) {
 		snap, err := cfg.Source.State()
 		writeJSON(w, snap, err)
@@ -131,7 +132,31 @@ func New(cfg Config) http.Handler {
 		})
 	}
 
-	return loggingMW(mux)
+	return loggingMW(corsMW(mux))
+}
+
+// corsMW echoes the request's Origin header back so the SPA can be
+// hosted anywhere (GitHub Pages, localhost, a tunnel) and still talk
+// to this server. We don't allow credentials, so echoing is safe; all
+// state-changing endpoints either are gated server-side (post-job
+// uses TREASURY_PK regardless of caller) or will be in a future push.
+//
+// For preflight (OPTIONS), we short-circuit with the CORS headers and
+// 204 — no need to invoke the actual handler.
+func corsMW(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if origin := r.Header.Get("Origin"); origin != "" {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Aegis-Wallet")
+		}
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func atoiDefault(s string, def int) int {
