@@ -31,6 +31,7 @@ type LoopConfig struct {
 	INftID     uint64            // verifier's iNFT token id; 0 if not minted yet
 	Corrupt    bool              // adversarial test: invert verdict before commit
 	SkipReveal bool              // censoring test: commit but never reveal
+	AutoSettle bool              // after revealing, auto-call settle(jobId) once revealDeadline passes
 	LogLabel   string            // prefix for log lines (e.g. "verifier-1")
 }
 
@@ -262,6 +263,81 @@ func (l *Loop) scheduleReveal(ctx context.Context, jobID *big.Int, job Job) {
 		Nonce:    "0x" + hex.EncodeToString(nonceBytes),
 		TxHash:   receipt.TxHash.Hex(),
 	}, l.axlPeerList())
+
+	if l.cfg.AutoSettle {
+		go l.scheduleSettle(ctx, jobID, job)
+	}
+}
+
+// scheduleSettle polls the chain's block timestamp until it's past
+// revealDeadline+5s, then attempts settle. settle() is permissionless
+// — all 3 verifiers may race; only the first call wins, the others
+// revert harmlessly with JobNotInStatus (status guard) which we
+// downgrade from ERROR to a quiet log line.
+//
+// We pay ~30k gas on the losing path; cheaper than electing a single
+// settler with an extra RPC roundtrip per job, and matches the
+// architecture's "settle is permissionless" framing.
+func (l *Loop) scheduleSettle(ctx context.Context, jobID *big.Int, job Job) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(1 * time.Second):
+		}
+		latest, err := l.cfg.OnChain.GetJob(ctx, jobID)
+		if err == nil {
+			job = latest
+		}
+		// If someone else already settled (status==Settled), bail.
+		if job.Status == 3 {
+			return
+		}
+		now, err := l.headTimestamp(ctx)
+		if err != nil {
+			continue
+		}
+		if now > job.RevealDeadline+5 {
+			break
+		}
+	}
+
+	// One last status check inside the same critical section so we
+	// don't broadcast a doomed tx if a peer just settled.
+	job, err := l.cfg.OnChain.GetJob(ctx, jobID)
+	if err == nil && job.Status == 3 {
+		return
+	}
+
+	sctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	receipt, err := l.cfg.OnChain.Settle(sctx, jobID)
+	l.bump(&l.stats.SettlesAttempt)
+	if err != nil {
+		// JobNotInStatus / JobAlreadySettled path: another verifier
+		// won the race. Quiet log; not an error.
+		if isAlreadySettled(err) {
+			l.logf("settle %s: already settled by peer", jobID)
+			return
+		}
+		l.logf("settle %s: %v", jobID, err)
+		return
+	}
+	l.logf("settle %s tx=%s attempts=%d", jobID, receipt.TxHash.Hex(), receipt.Attempts)
+}
+
+// isAlreadySettled spots the contract's status-guard reverts that
+// happen when another verifier won the settle race. Both manifest as
+// "execution reverted" with custom-error data; we match on the human
+// strings the EVM surfaces back.
+func isAlreadySettled(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := err.Error()
+	return strings.Contains(s, "JobNotInStatus") ||
+		strings.Contains(s, "JobAlreadySettled") ||
+		strings.Contains(s, "execution reverted")
 }
 
 // headTimestamp returns the latest block's timestamp (Unix seconds).

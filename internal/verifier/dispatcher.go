@@ -22,6 +22,11 @@ func CheckClaim(ctx context.Context, claim envelope.ExecutionClaim, vctx Context
 	switch claim.Spec.Action {
 	case "uniswap_v3_swap":
 		return CheckUniswapSwap(ctx, claim, vctx.Chain)
+	case "mock_usdc_transfer":
+		// Demo action: solver actually transfers Spec.AmountIn of
+		// Spec.TokenIn (mUSDC) to claim.ClientAddress on chain. The
+		// verifier reads the Transfer event from the receipt.
+		return CheckUSDCTransfer(ctx, claim, vctx.Chain)
 	default:
 		return fail(ReasonUnsupportedAction, Details{}), nil
 	}

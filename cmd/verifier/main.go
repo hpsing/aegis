@@ -60,6 +60,7 @@ import (
 
 func main() {
 	corrupt := flag.Bool("corrupt", false, "adversarial mode: invert verdict before commit")
+	autoSettle := flag.Bool("auto-settle", false, "after revealing, race to call settle() once revealDeadline passes (permissionless; status guard handles losers)")
 	label := flag.String("label", "", "log prefix (defaults to addr suffix)")
 	flag.Parse()
 
@@ -143,13 +144,14 @@ func main() {
 	log.Printf("[verifier] AXL: %s peer=%s…", axlURL, peer[:10])
 
 	loop := verifier.NewLoop(verifier.LoopConfig{
-		OnChain:  onchain,
-		SwapRPC:  swapClient,
-		Storage:  storage,
-		AXL:      axlClient,
-		INftID:   iNftID,
-		Corrupt:  *corrupt,
-		LogLabel: logLabel,
+		OnChain:    onchain,
+		SwapRPC:    swapClient,
+		Storage:    storage,
+		AXL:        axlClient,
+		INftID:     iNftID,
+		Corrupt:    *corrupt,
+		AutoSettle: *autoSettle,
+		LogLabel:   logLabel,
 	})
 
 	if err := loop.Run(ctx); err != nil && err != context.Canceled {

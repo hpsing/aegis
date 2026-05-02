@@ -35,11 +35,18 @@ Four pieces, each doing one job:
 
 ## Who pays what
 
-| Role            | Puts up                                                | Gets back                                                                      |
-| --------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| **Client**      | ~10,050 USDC (refundable except for ~50 USDC in fees)  | The work, or a refund + half the executor's slashed stake.                     |
-| **Executor**    | Their own ~10,000 USDC working capital + 500 USDC bond | A ~30 USDC fee on success. On a FAIL: working capital gone + 25% bond slashed. |
-| **Verifier ×3** | 100 USDC stake                                         | Share of bounty if in the majority. 10% stake slashed if in the minority.      |
+| Role                                  | Puts up                                                | Gets back                                                                      |
+| ------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| **Client** (job poster)               | ~10,050 USDC (refundable except for ~50 USDC in fees)  | The work, or a refund + half the executor's slashed stake.                     |
+| **Executor / Solver**                 | Their own ~10,000 USDC working capital + 500 USDC bond | A ~30 USDC fee on success. On a FAIL: working capital gone + 25% bond slashed. |
+| **Verifier ×3**                       | 100 USDC stake                                         | Share of bounty if in the majority. 10% stake slashed if in the minority.      |
+
+The **executor is a solver** in the UniswapX / CowSwap / 1inch Fusion
+sense — a bonded liquidity provider that reads job specs off-chain (over
+AXL), brings their own working capital to perform the on-chain action,
+and earns a fee on success. Picking a solver per job is currently
+first-come-first-served against an explicitly-named executor address;
+[future work](#future-work) replaces this with an auction.
 
 Verifiers and executors share the same `VerifierRegistry` — both are
 bonded participants, just at different stake levels.
@@ -241,27 +248,55 @@ Each verifier uses its own KH org (3 orgs total). Workflow slugs per
 purpose live in [configs/keeperhub.toml](configs/keeperhub.toml) under
 `[verifier_1]`, `[verifier_2]`, `[verifier_3]`. The `KEEPERHUB_VERIFIER_INDEX` env var picks which section a given verifier reads.
 
-#### KeeperHub bugs we hit + reported (now fixed upstream)
+#### What KeeperHub actually does today (be honest)
 
-The dual-leg pattern above (`execute_workflow` async for audit + sign and
-broadcast locally for the actual tx) exists because three KH issues blocked the
-straightforward `call_workflow → sign → broadcast` shape. We reported all
-three; KH responded that they're fixed:
+The architecture imagined KH as a **settlement-tx rail**: retry on
+transient failures, gas optimization, MEV protection, and audit. In
+this build KH delivers **only the audit slot** — every other promised
+value is blocked on upstream bugs.
 
-| #   | Symptom                                                                                                                                                                                                                                                                  | What we tried                                                                                                                                               | Status                                                                 |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| 1   | `web3/write-contract` action submitted at `maxPriorityFeePerGas=1.5 gwei`; 0G Galileo's mempool rejects with `gas tip cap below minimum (needed 2 gwei)`.                                                                                                                | `gasLimitMultiplier` (limit-only, not tip), looking for a `set_chain_gas` tool, wallet-integration config (empty). No per-org / per-chain gas knob existed. | Fixed — KH bumped the default / added a per-chain override. To verify. |
-| 2   | `call_workflow(slug, inputs)` returned `"No write action node found in workflow"` for a listed `workflowType=write` workflow whose action is `web3/write-contract`. `search_workflows({workflowType:"write"})` returned zero across the whole marketplace.               | Tried multiple action types and slug shapes; no documented action counted as a "write action node."                                                         | Fixed — calldata-emit path now ships. To verify.                       |
-| 3   | `execute_contract_call` with `_protocolMeta:{maxPriorityFeePerGas:...}` returned `status:"failed"` and never broadcasted (`eth_getTransactionCount` unchanged). `get_direct_execution_status` returned 405 on every call so the failure reason wasn't readable from MCP. | Tried various `_protocolMeta` shapes and direct-execution polling.                                                                                          | Fixed — `_protocolMeta` honored, status endpoint live. To verify.      |
+| Promised                                        | Delivered today                                                                              |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Reliable broadcast                              | No — `web3/write-contract` action can't submit on 0G Galileo (gas tip cap bug, see #1 below) |
+| Calldata emission via `call_workflow`           | No — returned `"No write action node found"` (#2)                                            |
+| Gas overrides via `_protocolMeta`               | No — silently ignored (#3)                                                                   |
+| Polling state via `get_direct_execution_status` | No — returns 405 on every call                                                               |
+| **Third-party audit dashboard**                 | Fixed — workflow invocations DO show up, even when the workflows themselves error            |
 
-**Why the workaround is still in place:** the dual-leg code in
-[internal/keeperhub/live.go](internal/keeperhub/live.go) hasn't been
-collapsed yet. Once each fix is verified end-to-end against this
-codebase, we'll drop the `execute_workflow` audit leg and switch to
-`call_workflow` returning unsigned `{to, data, value}` calldata, then
-sign + broadcast locally (we still want `msg.sender == verifier`
-without uploading the key to KH). The two legs collapse to one and the
-audit trail piggybacks on the same `call_workflow` invocation.
+The dual-leg pattern in [internal/keeperhub/live.go](internal/keeperhub/live.go)
+exists exactly because of this: we fire `execute_workflow` async into
+KH so the invocation lands on KH's dashboard, **and** in parallel we
+sign + broadcast the tx locally with the verifier's own key at 2 gwei
+tip. The on-chain tx lands via the local leg; the KH dashboard row
+exists for audit even when its own broadcast attempt errors.
+
+If you sign in to a verifier's KH org dashboard during a demo run,
+expect to see workflow invocations marked with errors like
+`Invalid function arguments: jobId: uint256 is missing` or
+`Failed to acquire nonce lock for 0x…:16602`. That's the upstream
+bug catalogue below; the actual on-chain commit/reveal/settle txs
+landed regardless.
+
+#### KeeperHub bugs we hit + reported
+
+All three were reported to the KeeperHub team (**Joel** and **Luca**)
+with full reproduction details + raw MCP request/response samples;
+they confirmed each as a known issue and committed to fixes. We share
+the reproducers here so anyone re-running this codebase against KH
+can verify whether each is still open.
+
+| #   | Symptom                                                                                                                                                                                                                                                                                                              | Reproducer                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Status                                                                                    |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 1   | `web3/write-contract` action submits at `maxPriorityFeePerGas=1.5 gwei`; 0G Galileo's mempool rejects with `gas tip cap below minimum (needed 2 gwei)`. No per-org / per-chain gas knob exists.                                                                                                                      | List a `web3/write-contract` workflow targeting any 0G Galileo (chain 16602) contract method. Trigger via `execute_workflow`. Watch the resulting tx — it never lands; KH dashboard shows the broadcast attempt as failed. Tried `gasLimitMultiplier` (limit-only, not tip cap), looking for a `set_chain_gas` MCP tool, and `_protocolMeta` (see #3).                                                                                                                                                                                                                              | Reported to Joel + Luca. Allegedly fixed; UNVERIFIED against this codebase.               |
+| 2   | `call_workflow(slug, inputs)` rejects every `web3/write-contract` workflow with `"No write action node found in workflow"`. `search_workflows({workflowType:"write"})` returns zero across the whole marketplace, suggesting no listed workflow counts as a write.                                                   | Create a workflow with action `web3/write-contract`, list it (give it a `listedSlug`), then call `call_workflow(slug, {jobId:"1", commitHash:"0x..."})`. Response: `"No write action node found in workflow"`. Also tried seven template syntaxes for the function-arg interpolation: `{{inputs.jobId}}`, `{{$.inputs.jobId}}`, `{{$inputs.jobId}}`, `{{inputs[0]}}`, `{{trigger.input.jobId}}`, `{{@manual-trigger:Manual Trigger.input.jobId}}`, and the bare `inputs.jobId` — every one fails with `Cannot convert <template> to a BigInt` or `Unresolvable template reference`. | Reported to Joel + Luca with the full template-syntax probe. Allegedly fixed; UNVERIFIED. |
+| 3   | `execute_contract_call` with `_protocolMeta:{maxPriorityFeePerGas:"2000000000"}` returns `status:"failed"` and never broadcasts. Verified by polling `eth_getTransactionCount` on the wallet — never changes. `get_direct_execution_status` returns 405 on every call so the failure reason isn't readable from MCP. | `execute_contract_call({contractAddress:"0xa89833fB...", method:"commitVote", args:["1","0x..."], _protocolMeta:{maxPriorityFeePerGas:"2000000000"}})`. Then `cast nonce <wallet> --rpc-url https://evmrpc-testnet.0g.ai` — unchanged. Then `get_direct_execution_status({executionId:"<id>"})` → HTTP 405.                                                                                                                                                                                                                                                                         | Reported to Joel + Luca. Allegedly fixed; UNVERIFIED.                                     |
+
+**Verification owed.** A scheduled agent was meant to re-probe these
+against the live MCP and either collapse the dual-leg or confirm the
+bugs are still open — see the conversation log; it was deferred. The
+collapse target is documented in [internal/keeperhub/live.go:62-66](internal/keeperhub/live.go#L62-L66):
+drop the `execute_workflow` audit leg, switch to a single
+`call_workflow → sign locally → broadcast` cycle.
 
 ### 0G Storage: post-settlement receipts
 
@@ -361,6 +396,107 @@ gateway (or the SDK's download method) to read the actual bytes.
 | `swap (synth.)` link 404s on chainscan                                           | The "swap" tx is a synthetic hash the executor invents locally — no real swap broadcasts               | Working as intended; the e2e output no longer prints this link                                                                                                   |
 | `(no proofbundle root found in log)`                                             | Verifiers abstained → no `JobSettled` handler → no upload                                              | Same root cause as the abstain row above; fix that and ProofBundles populate                                                                                     |
 | ProofBundle `view:` link doesn't resolve on `storagescan-galileo.0g.ai`          | Roots are 0G Storage merkle roots, not EVM tx hashes; gateway URL pattern depends on the explorer      | Override with `STORAGE_GATEWAY=...` or query the 0G Storage indexer directly with the root                                                                       |
+
+## Future work
+
+Things explicitly out of scope for this build, with the design sketch
+of how each would land.
+
+### Solver auction (replace fixed-executor assignment)
+
+Today the client names a single executor address in `postJob` and
+that address is the only one allowed to `submitClaim`. The "solver"
+framing is honest but the market mechanism isn't: there's no
+competition. Production:
+
+- Client posts the job _without_ a fixed executor (pass `address(0)`
+  as a sentinel meaning "open").
+- Solvers watch the AXL spec stream, compute the cost / risk for
+  themselves, and respond with a signed bid envelope: `{solver,
+  jobId, fee, deadline, sig}`.
+- Within a short auction window (e.g., 5 s of wall time), the client
+  picks the winner — lowest fee that still clears their reserve, with
+  a tiebreaker on solver reputation (`accuracyBps` from the
+  `VerifierRegistry`).
+- Client signs an `assignSolver(jobId, solver, fee)` tx that locks
+  the chosen fee and grants that one address `submitClaim` rights.
+
+This is a UniswapX / CowSwap solver auction in miniature. The
+`VerifierRegistry`'s reputation column already supports the
+tiebreaker; only the on-chain auction primitive is missing.
+
+### Real Uniswap V3 path on Base (drop synthetic-claim mode)
+
+The `mock_usdc_transfer` action already proves the verify-against-chain
+loop end-to-end. Production swaps the action surface back to
+`uniswap_v3_swap` and points `SWAP_RPC` at Base, so the executor's
+real swap receipt is what verifiers read. That's "step 7" in the
+architecture doc — same `CheckUniswapSwap` already shipped in
+[internal/verifier/check_uniswap_swap.go](internal/verifier/check_uniswap_swap.go),
+just needs an executor that brings real ETH on Base.
+
+### Multi-hop swaps + other DEXes
+
+`uniswapv3.DeploymentForChain` only knows the official V3 deployments.
+A multi-hop check needs to:
+
+- Walk every `Swap` log in the receipt (not just the first).
+- Verify the path's ordered pool addresses derive from the spec's
+  hop list.
+- Sum amounts across hops; compare net `amountOut` to spec's slippage
+  bound.
+
+Adding 1inch / CoW / 0x is the same shape — one new
+`Check<Protocol>` per dispatch case in [dispatcher.go](internal/verifier/dispatcher.go).
+
+### ZK proof of verifier execution
+
+Today verifiers re-run the chain check independently and we trust the
+2-of-3 majority. A v2 has each verifier emit a SNARK proving "I ran
+`CheckClaim` on this spec + chain state and got verdict X" instead of
+voting. Settle becomes "any one valid proof wins." Drops the
+verifier-collusion threat at the cost of significant prover-side
+complexity. RISC Zero or SP1 are the obvious tracks.
+
+### Slashing for non-revealers
+
+Right now a verifier that commits but never reveals is "censored":
+their commit doesn't count toward the tally, no slash. A motivated
+attacker can commit, watch others' reveals, and selectively withhold
+their own — costs them the bounty share but no stake. Fix: add
+`slashNonRevealer(jobId, verifier)` callable after `revealDeadline`
+that takes 5% of stake.
+
+### Cross-chain verification beyond Base + 0G
+
+The verifier loop assumes one `SWAP_RPC` per process. A multi-chain
+verifier reads `Spec.ChainID` and dispatches to the right RPC client.
+Per-chain reorg windows (different `MinConfirmations`) wire into
+[internal/chain/](internal/chain/).
+
+### KeeperHub: collapse the dual-leg
+
+Once the three KH-side bugs (see [KH section](#keeperhub-bugs-we-hit--reported))
+are verified fixed, drop the audit-trail `execute_workflow` leg and
+switch to `call_workflow → sign locally → broadcast`. Single round-trip,
+single audit row per tx. Target documented in
+[internal/keeperhub/live.go:62-66](internal/keeperhub/live.go#L62-L66).
+
+### Settler bot / per-chain keeper rewards
+
+Today verifier-1 races to call `settle()` after the reveal deadline,
+losing ~30k gas on the other two reverts. A keeper-style settler bot
+(third-party, not part of the swarm) could be the only caller, with a
+small `settler_tip` carved out of the bounty as compensation. Verifiers
+get back the gas they currently waste.
+
+### iNFT minting on register
+
+`register(stake, iNftId)` currently accepts `iNftId=0` (the demo's
+sentinel for "not minted"). Production mints a fresh ERC-7857 iNFT
+per verifier as part of registration, populates `agentCardURI`
+pointing to a JSON on 0G Storage, and the roster page surfaces it
+with a real "View on 0G ↗" link instead of the current empty chip.
 
 ## Further reading
 

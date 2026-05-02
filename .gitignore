@@ -24,3 +24,8 @@ broadcast/
 /executor
 /mock-axl
 *.test
+/bin/
+
+# UI: SPA dist copied for go:embed; rebuilt by scripts/build-ui.sh
+/cmd/ui/web-dist/*
+!/cmd/ui/web-dist/.gitkeep

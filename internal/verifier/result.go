@@ -28,6 +28,8 @@ const (
 	ReasonInsufficientConfirmations  = "insufficient_confirmations"
 	ReasonUnknownDeployment          = "unknown_deployment"
 	ReasonMissingClientAddress       = "missing_client_address"
+	ReasonNoTransferEvent            = "no_transfer_event"
+	ReasonAmountInsufficient         = "amount_insufficient"
 )
 
 // Result is what CheckClaim hands back. Verdict is the headline; Reason
