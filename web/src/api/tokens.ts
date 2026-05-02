@@ -1,8 +1,9 @@
 // Friendly labels for well-known addresses we encounter in the demo.
-// The map covers (a) Base mainnet tokens used in the synthetic swap
-// spec, (b) 0G Galileo deployment addresses (USDC, contracts), and
-// (c) per-org KeeperHub wallets we ourselves operate. Keys MUST be
-// lowercased — caller normalizes before lookup.
+// The map covers (a) 0G Galileo deployment addresses (mUSDC, Aegis,
+// VerifierRegistry, OG Storage flow), (b) per-org KeeperHub verifier
+// wallets we ourselves operate, and (c) historical Base mainnet token
+// labels left in for older jobs that used the synthetic-swap spec.
+// Keys MUST be lowercased — caller normalizes before lookup.
 
 export interface KnownAddr {
   symbol: string
@@ -11,7 +12,7 @@ export interface KnownAddr {
 }
 
 const REGISTRY: Record<string, KnownAddr> = {
-  // Base — what the synthetic swap claims to have done
+  // Historical: tokens referenced by older synthetic-swap job specs.
   '0x036cbd53842c5426634e7929541ec2318f3dcf7e': { symbol: 'USDC', name: 'USD Coin', chain: 'Base' },
   '0x4200000000000000000000000000000000000006': { symbol: 'WETH', name: 'Wrapped Ether', chain: 'Base' },
 
@@ -40,4 +41,19 @@ export function addrLabel(addr?: string): string {
   const k = knownAddr(addr)
   if (!k) return ''
   return k.symbol
+}
+
+// chainLabel returns a human-readable name for known chain ids the
+// demo touches. Falls back to "chain <id>" so we don't lie when the
+// spec carries something unfamiliar.
+const CHAINS: Record<number, string> = {
+  16602: '0G Galileo testnet',
+  8453: 'Base mainnet',
+  84532: 'Base Sepolia',
+  1: 'Ethereum mainnet',
+}
+
+export function chainLabel(chainId?: number): string {
+  if (!chainId) return ''
+  return CHAINS[chainId] ?? `chain ${chainId}`
 }

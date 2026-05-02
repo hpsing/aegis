@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { addrLink, fmtMUSDC } from '@/api/links'
-import { knownAddr } from '@/api/tokens'
+import { knownAddr, chainLabel } from '@/api/tokens'
 import type { KnownAddr } from '@/api/tokens'
 import type { PostJobPreview } from '@/api/types'
 import Copyable from '@/components/Copyable.vue'
@@ -81,7 +81,7 @@ onMounted(load)
             </div>
             <dl class="grid grid-cols-[120px_1fr] gap-y-1.5 items-baseline">
               <dt class="text-ink-3">chain</dt>
-              <dd>{{ preview.spec.chainId }} · Base mainnet</dd>
+              <dd>{{ preview.spec.chainId }} · {{ chainLabel(preview.spec.chainId) }}</dd>
 
               <dt class="text-ink-3">tokenIn</dt>
               <dd>
