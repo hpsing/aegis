@@ -1,0 +1,21 @@
+[Unit]
+Description=Aegis verifier %i
+PartOf=aegis.target
+After=aegis-axl-peers.service network-online.target
+Wants=aegis-axl-peers.service
+
+[Service]
+Type=simple
+User=aegis
+Group=aegis
+WorkingDirectory=/opt/aegis
+EnvironmentFile=/etc/aegis/aegis.env
+EnvironmentFile=/etc/aegis/verifier-%i.env
+ExecStart=/opt/aegis/bin/aegis-verifier --label v%i --auto-settle
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/aegis/verifier-%i.log
+StandardError=append:/var/log/aegis/verifier-%i.log
+
+[Install]
+WantedBy=aegis.target

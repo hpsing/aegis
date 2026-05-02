@@ -1,0 +1,17 @@
+[Unit]
+Description=Aegis AXL peer discovery (writes per-verifier env files)
+PartOf=aegis.target
+After=aegis-axl@pub.service aegis-axl@v1.service aegis-axl@v2.service aegis-axl@v3.service
+Wants=aegis-axl@pub.service aegis-axl@v1.service aegis-axl@v2.service aegis-axl@v3.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+EnvironmentFile=/etc/aegis/aegis.env
+ExecStart=/opt/aegis/bin/aegis-discover-peers.sh
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=aegis.target

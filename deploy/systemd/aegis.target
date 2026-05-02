@@ -1,0 +1,10 @@
+[Unit]
+Description=Aegis demo (AXL swarm + 3 verifiers + UI)
+Wants=aegis-axl@pub.service aegis-axl@v1.service aegis-axl@v2.service aegis-axl@v3.service
+Wants=aegis-axl-peers.service
+Wants=aegis-verifier@1.service aegis-verifier@2.service aegis-verifier@3.service
+Wants=aegis-ui.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target

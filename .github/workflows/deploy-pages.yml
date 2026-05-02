@@ -50,6 +50,10 @@ jobs:
           # asset URLs in index.html need that prefix. Repo name comes
           # from the `repository` context (e.g. "user/aegis" → "/aegis/").
           VITE_GH_PAGES_BASE: /${{ github.event.repository.name }}/
+          # Default API endpoint baked into the build. Users who haven't
+          # pasted a custom URL fall back to this (see web/src/api/base.ts).
+          # Anyone with a value already in localStorage keeps their override.
+          VITE_API_BASE: https://13-232-33-65.sslip.io
         run: npm run build
 
       - name: Upload Pages artifact

@@ -1,0 +1,30 @@
+# /etc/caddy/Caddyfile
+#
+# sslip.io resolves *.<ip>.sslip.io → <ip>, so Let's Encrypt issues a
+# real cert for 13-232-33-65.sslip.io without us owning a domain.
+# Replace the address below with your EC2 public IP using HYPHENS
+# (dots also work, but hyphens are slightly more reliable for ACME).
+#
+# Caddy auto-renews, redirects 80→443, and gzips responses.
+
+13-232-33-65.sslip.io {
+	encode gzip
+
+	# /api/events is SSE — disable response buffering so chunks reach
+	# the browser immediately, otherwise Caddy holds them and the live
+	# UI feels frozen.
+	@sse path /api/events
+	reverse_proxy @sse 127.0.0.1:3000 {
+		flush_interval -1
+		transport http {
+			read_buffer 4KB
+		}
+	}
+
+	reverse_proxy 127.0.0.1:3000
+
+	log {
+		output file /var/log/caddy/aegis.log
+		format console
+	}
+}

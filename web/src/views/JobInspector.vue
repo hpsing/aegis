@@ -118,11 +118,10 @@ const verdictClass = computed(() => {
   return 'text-ink-2'
 })
 
-// Detect "every verifier voted FAIL" — that's the synthetic-claim
-// signature (verifiers can't find the swap on the configured swap
-// chain). The hint banner only appears in this case so legitimate
-// dissenter-FAIL outcomes (1-2 verifiers voting FAIL) don't get the
-// "this is your demo's fault" framing.
+// Unanimous FAIL: every verifier voted against the executor's claim.
+// Banner only fires for 3-of-3 FAIL so dissenter-FAIL outcomes (1-2
+// verifiers voting FAIL while the rest PASS) don't get a "swarm
+// rejected" framing — those are minority-quorum cases, not consensus.
 const allRevealsAreFail = computed(() => {
   if (!job.value || job.value.reveals.length === 0) return false
   return job.value.reveals.every((r) => r.verdict === 'FAIL')
@@ -178,7 +177,7 @@ const allRevealsArePass = computed(() => {
         </div>
       </aside>
 
-      <!-- Unanimous FAIL: phantom claim rejected by the swarm -->
+      <!-- Unanimous FAIL: swarm rejected the claim -->
       <aside
         v-else-if="job.finalVerdict === 'FAIL' && allRevealsAreFail"
         class="panel border-accent-axl/40 bg-bg-subtle p-3 flex gap-3 items-start"
@@ -189,16 +188,17 @@ const allRevealsArePass = computed(() => {
             Unanimous FAIL — swarm rejected the claim
           </div>
           <div class="text-ink-2">
-            All 3 verifiers independently checked the chain and couldn't confirm the claimed
-            outcome. Most common causes: the executor used the older
-            <code class="text-ink-1">uniswap_v3_swap</code> action (which builds a synthetic
-            receipt locally — see the older e2e-demo path), or the spec's chain id doesn't
-            match <code class="text-ink-1">SWAP_RPC</code>.
+            All 3 verifiers independently checked the chain and couldn't confirm the
+            <code class="text-ink-1">Transfer</code> event matching the spec
+            (recipient + amount on 0G Galileo). The swarm working as designed: an
+            unverifiable claim gets rejected.
           </div>
           <div class="text-ink-3 pt-1 border-t border-bg-border">
-            New jobs from <strong>"Post Job…"</strong> use the
-            <code class="text-ink-1">mock_usdc_transfer</code> action which performs a real
-            on-chain transfer and should PASS.
+            Older jobs may be from the legacy synthetic-claim path
+            (<code class="text-ink-1">uniswap_v3_swap</code> built a receipt locally
+            without broadcasting). New jobs from <strong>"Post Job…"</strong> use
+            <code class="text-ink-1">mock_usdc_transfer</code> — a real on-chain
+            mUSDC transfer — and should PASS.
           </div>
         </div>
       </aside>

@@ -1,0 +1,33 @@
+[Unit]
+Description=Aegis UI server
+PartOf=aegis.target
+After=aegis-axl@pub.service network-online.target
+Wants=aegis-axl@pub.service
+
+[Service]
+Type=simple
+User=aegis
+Group=aegis
+WorkingDirectory=/opt/aegis
+EnvironmentFile=/etc/aegis/aegis.env
+# All chain config goes in via ExecStart flags. systemd does ${VAR}
+# substitution in ExecStart= (but NOT in Environment=, which is why an
+# earlier "Environment=AEGIS_RPC=${RPC_URL}" passed the literal string).
+ExecStart=/opt/aegis/bin/aegis-ui \
+  --addr ${UI_ADDR} \
+  --backfill 200000 \
+  --rpc ${RPC_URL} \
+  --aegis ${AEGIS_ADDR} \
+  --usdc ${USDC_ADDR} \
+  --registry ${REGISTRY_ADDR} \
+  --treasury-pk ${TREASURY_PK} \
+  --executor-pk ${EXECUTOR_PK} \
+  --logs ${UI_LOGS_DIR} \
+  --axl ${UI_AXL_DAEMONS}
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/aegis/ui.log
+StandardError=append:/var/log/aegis/ui.log
+
+[Install]
+WantedBy=aegis.target

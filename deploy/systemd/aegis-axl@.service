@@ -1,0 +1,22 @@
+[Unit]
+Description=AXL daemon (%i)
+PartOf=aegis.target
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aegis
+Group=aegis
+WorkingDirectory=/opt/aegis
+ExecStart=/opt/aegis/bin/axl-node -config /opt/aegis/axl/cfgs/node-%i.json
+Restart=always
+RestartSec=2
+StandardOutput=append:/var/log/aegis/axl-%i.log
+StandardError=append:/var/log/aegis/axl-%i.log
+
+# AXL cross-peer dialer routes via the sender's tcp_port — sharing 7001
+# across all four daemons is by design (see scripts/run-axl-swarm.sh).
+
+[Install]
+WantedBy=aegis.target

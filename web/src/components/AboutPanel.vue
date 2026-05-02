@@ -102,17 +102,22 @@ defineEmits<{ (e: 'close'): void }>()
           </p>
         </section>
 
-        <section class="panel border-accent-axl/40 bg-accent-axl/5 p-3">
-          <h3 class="text-accent-axl text-sm font-bold mb-1">Why FAIL? (synthetic-claim demo mode)</h3>
+        <section class="panel border-accent-pass/40 bg-accent-pass/5 p-3">
+          <h3 class="text-accent-pass text-sm font-bold mb-1">What does PASS mean here?</h3>
           <p class="text-ink-2">
-            This build runs in <strong>synthetic-claim mode</strong>. The solver builds the swap
-            receipt locally — the tx never broadcasts. Verifiers correctly can't find it on chain
-            and vote FAIL. The unanimous-FAIL outcome is the swarm working as designed: a phantom
-            claim gets rejected.
+            The executor signs and broadcasts a real <code class="text-ink-1">mUSDC.transfer(client, amount)</code>
+            on 0G Galileo testnet. Each verifier independently fetches the receipt, parses the
+            <code class="text-ink-1">Transfer(executor → client, amount)</code> event, and votes
+            <strong>PASS</strong> only if it matches the spec. Mismatch or missing receipt → <strong>FAIL</strong>.
           </p>
           <p class="text-ink-3 mt-1">
-            Production (architecture step 7) has the solver perform a real Uniswap V3 swap on Base;
-            verifiers find the receipt and vote PASS.
+            mUSDC is our deployed mock ERC-20 — same execution path a production solver would use
+            for a stablecoin payout. Architecture step 7 swaps this for a real Uniswap V3 trade
+            on Base; verifier logic stays identical (parse receipt, match spec).
+          </p>
+          <p class="text-ink-3 mt-1">
+            Older jobs (#16, #12) that show FAIL pre-date the mUSDC integration — they ran in the
+            historical synthetic-claim mode where the tx never broadcast.
           </p>
         </section>
 
