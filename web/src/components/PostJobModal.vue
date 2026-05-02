@@ -102,7 +102,12 @@ onMounted(load)
               </dd>
 
               <dt class="text-ink-3">amountIn</dt>
-              <dd>{{ preview.spec.amountIn }} <span class="text-ink-3">(raw, 6-decimal)</span></dd>
+              <dd>
+                {{ fmtMUSDC(preview.spec.amountIn) }}
+                <span class="text-ink-3" title="Exact amount the verifier expects to see in the on-chain Transfer event. Independent of the escrow pot below.">
+                  · verifiable transfer ({{ preview.spec.amountIn }} raw)
+                </span>
+              </dd>
 
               <dt class="text-ink-3">max slippage</dt>
               <dd>{{ preview.spec.maxSlippageBps }} bps</dd>
@@ -138,11 +143,16 @@ onMounted(load)
 
         <!-- Escrow -->
         <section>
-          <div class="text-ink-3 uppercase tracking-wider mb-2">Escrow (mUSDC)</div>
+          <div class="flex items-baseline justify-between mb-2">
+            <div class="text-ink-3 uppercase tracking-wider">Escrow (mUSDC)</div>
+            <div class="text-ink-3 text-[11px]">
+              treasury locks this pot at <code class="text-ink-2">postJob</code>; released on <code class="text-ink-2">settle</code>
+            </div>
+          </div>
           <div class="panel bg-bg-subtle/50 p-3 grid grid-cols-2 gap-y-1">
             <span class="text-ink-3">executor reimbursement</span><span class="text-right">{{ fmtMUSDC(preview.reimbursement) }}</span>
             <span class="text-ink-3">executor fee (on PASS)</span><span class="text-right">{{ fmtMUSDC(preview.fee) }}</span>
-            <span class="text-ink-3">verifier bounty</span><span class="text-right">{{ fmtMUSDC(preview.bounty) }}</span>
+            <span class="text-ink-3">verifier bounty (split 3 ways)</span><span class="text-right">{{ fmtMUSDC(preview.bounty) }}</span>
             <span class="text-ink-0 border-t border-bg-border pt-1">total locked</span>
             <span class="text-ink-0 text-right border-t border-bg-border pt-1">{{ fmtMUSDC(preview.totalEscrow) }}</span>
           </div>

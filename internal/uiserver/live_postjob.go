@@ -150,9 +150,6 @@ func (s *LiveSource) runPostJob(ctx context.Context) (PostJobResult, error) {
 	pjLog("axl", "spec published")
 
 	// 4. solver action: actually transfer mUSDC executor→client on chain.
-	// Spec.AmountIn = transferAmount (matches reimbursement). The
-	// verifier will read this tx's Transfer event and PASS when it
-	// matches recipient + amount.
 	transferAmount := big.NewInt(transferAmountMUSDC)
 	pjLog("executor", "preflight: minting mUSDC to executor wallet if low")
 	if err := s.preflightExecutorBalance(ctx, usdc, executorKey, chainID, transferAmount); err != nil {
